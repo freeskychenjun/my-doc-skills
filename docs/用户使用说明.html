@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>设计报告一键排版 Skill · 用户使用说明</title>
+<style>
+  :root {
+    --ink: #1f2329;
+    --ink-2: #4e5560;
+    --accent: #1a5fb4;
+    --accent-soft: #eaf2fc;
+    --line: #d9dee5;
+    --bg-soft: #f6f8fa;
+    --warn-bg: #fff8e6;
+    --warn-line: #e6a23c;
+    --ok: #2e8b57;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Microsoft YaHei", "微软雅黑", "PingFang SC", sans-serif;
+    color: var(--ink);
+    line-height: 1.75;
+    background: #fff;
+  }
+  .page { max-width: 880px; margin: 0 auto; padding: 48px 40px 80px; }
+
+  header.hero {
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 20px;
+    margin-bottom: 32px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 28px; }
+  header.hero .sub { color: var(--ink-2); font-size: 15px; }
+  header.hero .ver {
+    display: inline-block; margin-top: 10px; padding: 2px 10px;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 12px; font-size: 12.5px;
+  }
+
+  h2 {
+    font-size: 20px; margin: 40px 0 14px; padding-left: 12px;
+    border-left: 4px solid var(--accent);
+  }
+  h3 { font-size: 16px; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+  code {
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 6px;
+    font-family: Consolas, "Courier New", monospace; font-size: 13.5px;
+  }
+  pre {
+    background: #2b2f36; color: #e8eaed; border-radius: 8px;
+    padding: 14px 18px; overflow-x: auto; font-size: 13.5px; line-height: 1.6;
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; }
+  pre .cmt { color: #8b93a1; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    border: 1px solid var(--line); padding: 8px 12px;
+    text-align: left; vertical-align: top;
+  }
+  th { background: var(--bg-soft); font-weight: 600; white-space: nowrap; }
+
+  .note, .warn, .tip {
+    border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 14px;
+  }
+  .note { background: var(--accent-soft); border-left: 4px solid var(--accent); }
+  .warn { background: var(--warn-bg); border-left: 4px solid var(--warn-line); }
+  .tip  { background: #ecf7ef; border-left: 4px solid var(--ok); }
+  .note .t, .warn .t, .tip .t { font-weight: 700; margin-right: 6px; }
+
+  .chat {
+    background: var(--bg-soft); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 16px; margin: 10px 0; font-size: 14.5px;
+  }
+  .chat::before {
+    content: "你可以这样对 AI 说：";
+    display: block; font-size: 12.5px; color: var(--ink-2); margin-bottom: 4px;
+  }
+  .chat em { font-style: normal; color: var(--accent); font-weight: 600; }
+
+  .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .steps li {
+    counter-increment: step; position: relative;
+    padding-left: 40px; margin: 12px 0;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 2px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff;
+    text-align: center; line-height: 26px; font-size: 14px; font-weight: 600;
+  }
+
+  footer {
+    margin-top: 56px; padding-top: 16px;
+    border-top: 1px solid var(--line);
+    color: var(--ink-2); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="hero">
+  <h1>设计报告一键排版 Skill</h1>
+  <div class="sub">让 AI 助手帮你把 Word 报告按水利工程报告规范自动排版：页面设置、标题、正文、图名表名、表格，一键完成。</div>
+  <span class="ver">版本 1.0 · 2026-07</span>
+</header>
+
+<h2>1. 这是什么</h2>
+<p>这是一个供 AI 助手（Claude Code）调用的排版技能。你<strong>不需要</strong>学习任何命令，只要用平常的话告诉 AI「帮我排版某个文档」，AI 就会自动调用本技能，完成：</p>
+<ul>
+  <li><strong>页面设置</strong> — A4 纸，页边距（上 3.7 / 下 3.5 / 左 2.8 / 右 2.6 cm）</li>
+  <li><strong>标题</strong> — 自动识别一至四级标题（「第X章」「1.1」「1.1.1.1」等），应用规范字体字号，并在导航窗格中建立正确的层级</li>
+  <li><strong>正文</strong> — 宋体小四、两端对齐、首行缩进 2 字符、固定行距</li>
+  <li><strong>图名 / 表名</strong> — 自动识别「图X-X」「表X-X」说明文字，居中、黑体五号</li>
+  <li><strong>表格</strong> — 外边框（默认 1.5 磅）、自适应窗口宽度、字体默认跟随正文（字号不变）、首行标题自动外提、清理多余空格</li>
+  <li><strong>跳过页面</strong> — 封面、扉页等前 N 页可指定不排版</li>
+</ul>
+<p>排版引擎源自 Word 插件「CJTools 一键排版」，本技能自带全部组件、独立运行，无需安装任何插件。</p>
+
+<h2>2. 运行环境</h2>
+<table>
+  <tr><th>要求</th><th>说明</th></tr>
+  <tr><td>操作系统</td><td>Windows</td></tr>
+  <tr><td>Word</td><td>桌面版 Microsoft Word 2010 及以上（2013 / 2016 / 2019 / 2021 / Microsoft 365 均可）</td></tr>
+  <tr><td>文档格式</td><td><code>.docx</code> 或 <code>.doc</code></td></tr>
+</table>
+<div class="warn"><span class="t">注意</span>不支持 WPS Office 和 Word 网页版。电脑上不需要安装 CJTools 插件，本技能自带全部组件；已装插件也不冲突。</div>
+
+<h2>3. 快速上手</h2>
+<ol class="steps">
+  <li><strong>关闭文档。</strong>确认要排版的 Word 文档没有在任何 Word 窗口中打开。</li>
+  <li><strong>告诉 AI 你要排版。</strong>直接用自然语言，例如：</li>
+</ol>
+<div class="chat"><em>排版 D:\报告\七星水库放空评估报告.docx</em></div>
+<div class="chat"><em>排版 D:\报告\七星水库放空评估报告.docx，跳过前 4 页</em></div>
+<div class="chat"><em>排版这份报告，表格里的字体用宋体五号</em></div>
+<ol class="steps" start="3">
+  <li><strong>等待完成。</strong>长文档排版时，AI 会<strong>中途分段汇报进度</strong>（当前处理到第几段、已用时），完成后给出统计结果。普通报告约几秒到几分钟；几百页、表格很多的报告可能需要 5 分钟以上，属正常现象。</li>
+  <li><strong>检查结果。</strong>排版结果默认<strong>另存为新文件</strong>（文件名加「-排版」后缀），原稿不会被改动。打开新文件检查标题层级、正文格式、表格边框等。</li>
+</ol>
+<div class="tip"><span class="t">提示</span>如果对结果不满意，告诉 AI 调整要求（如「一级标题换成小三」「正文行距改 28 磅」），它会修改规则后基于原稿重新排版。</div>
+
+<h2>4. 排版规范（默认规则）</h2>
+<table>
+  <tr><th>段落类型</th><th>中文字体</th><th>西文字体</th><th>字号</th><th>其他</th></tr>
+  <tr><td>一级标题</td><td>黑体</td><td>Times New Roman</td><td>三号（16pt）</td><td>居中，段前段后 24 磅</td></tr>
+  <tr><td>二级标题</td><td>楷体</td><td>Times New Roman</td><td>四号（14pt）加粗</td><td>左对齐，段前段后 12 磅</td></tr>
+  <tr><td>三级标题</td><td>宋体</td><td>Times New Roman</td><td>小四（12pt）</td><td>左对齐</td></tr>
+  <tr><td>四级标题</td><td>宋体</td><td>Times New Roman</td><td>小四（12pt）</td><td>左对齐</td></tr>
+  <tr><td>正文</td><td>宋体</td><td>Times New Roman</td><td>小四（12pt）</td><td>两端对齐，首行缩进 2 字符，固定行距 25 磅</td></tr>
+  <tr><td>图名 / 表名</td><td>黑体</td><td>Times New Roman</td><td>五号（10.5pt）</td><td>居中，固定行距 15 磅</td></tr>
+  <tr><td>表格内容</td><td>跟随正文（默认宋体）</td><td>跟随正文（正文为宋体时用 Times New Roman）</td><td>保留原字号</td><td>外边框 1.5 磅，自适应窗口宽度</td></tr>
+</table>
+
+<h3>4.1 标题是怎么识别的</h3>
+<ul>
+  <li>「第X章 / 第X篇 / 第X部」→ 一级标题；「第X节」→ 二级标题</li>
+  <li>数字编号按层级识别：<code>1</code> → 一级，<code>1.1</code> → 二级，<code>1.1.1</code> → 三级，<code>1.1.1.1</code> → 四级（Word 自动编号同样支持）</li>
+  <li>已使用「标题 N」样式的段落 → 按样式级别识别</li>
+  <li>「图…」「表…」开头且不超过 40 字的短段落 → 图名 / 表名</li>
+</ul>
+<div class="note"><span class="t">说明</span>超过 60 字的段落不会被识别为标题，超过 40 字的「图/表」开头段落不会被识别为图名表名——这是防止正文误判的保护机制。</div>
+
+<h3>4.2 定制排版规则</h3>
+<p>常用定制直接口头告诉 AI 即可，它会自动调整规则：</p>
+<div class="chat"><em>跳过前 2 页，正文行距改成 28 磅</em></div>
+<div class="chat"><em>表格内容字号统一成五号（默认是保留原字号）</em></div>
+<div class="note"><span class="t">说明</span>表格首行标题外提、表格外边框（默认 1.5 磅）、表格字体跟随正文，均已是默认行为；如需关闭或调整（如「不要外提标题」「外边框改 1 磅」「表格用固定字体」），直接告诉 AI 即可。</div>
+<p>本技能自带默认规则（水利工程报告），独立运行、无需安装任何插件。完整规则字段说明见技能目录下的 <code>references/rules-schema.md</code>。</p>
+
+<h2>5. 常见问题</h2>
+
+<h3>Q1. 提示「文档以只读方式打开 / 被占用」</h3>
+<p>该文档正在 Word 中打开。请关闭所有包含此文档的 Word 窗口后重试。</p>
+
+<h3>Q2. 提示「受保护的视图」</h3>
+<p>从网上下载或邮件收到的文档，Word 会以「受保护的视图」打开。请先在 Word 中打开该文件，点击顶部黄色提示条中的「启用编辑」，保存关闭后再排版。</p>
+
+<h3>Q3. 排版要很久正常吗？</h3>
+<p>正常。排版通过 Word 自动化逐段处理，文档越大、段落和表格越多越慢。一万段以上的报告约需 5 分钟，请耐心等待，不要中途打开 Word 干扰。</p>
+
+<h3>Q4. 某个标题没被识别 / 识别错了？</h3>
+<p>先检查该标题是否超过 60 字、是否以规范编号开头。把具体情况告诉 AI（如「第 3 章的 3.2.1 没被识别成三级标题」），它会帮你排查。</p>
+
+<h3>Q5. 排版会改坏我的原稿吗？</h3>
+<p>不会。默认另存为新文件，原稿保持不动。除非你明确要求「直接改原文件」。</p>
+
+<h3>Q6. 排版中途 Word 弹窗了？</h3>
+<p>排版在后台独立的 Word 进程中进行，不影响你正常使用 Word。如果看到异常的 Word 窗口或报错弹窗，把它关掉并告知 AI 重新执行即可。</p>
+
+<h2>6. 技能目录结构（供维护参考）</h2>
+<pre><code>设计报告排版skill/
+├─ SKILL.md                  <span class="cmt"># 技能说明（AI 读取）</span>
+├─ scripts/
+│  ├─ FormatDocx.exe         <span class="cmt"># 排版命令行程序</span>
+│  └─ *.dll                  <span class="cmt"># 排版引擎及依赖</span>
+├─ references/
+│  ├─ rules-schema.md        <span class="cmt"># 规则字段完整说明</span>
+│  └─ default-rule.json      <span class="cmt"># 默认排版规则</span>
+└─ docs/
+   └─ 用户使用说明.html       <span class="cmt"># 本文档</span></code></pre>
+
+<footer>
+  设计报告一键排版 Skill · 排版引擎与 CJTools Word 插件同源 · 有问题请联系管理员
+</footer>
+
+</div>
+</body>
+</html>
