@@ -1,0 +1,14 @@
+# Build outputs (regenerate via MSBuild; see CLAUDE.md / README.md)
+src/FormatDocxHost/bin/
+src/FormatDocxHost/obj/
+
+# Dev scratch (test docs, probes, logs)
+tmp/
+
+# OS artifacts
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Word temp / lock files
+~$*
