@@ -35,6 +35,38 @@ from lint_paragraphs import auto_fix
 sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 
 
+def unify_unit_style(original, text):
+    """单位体例跟随原文：原文未用上标（²/³）时，把改写文本里的上标还原为普通数字。
+    避免局部段落用 m³/km²、其余数百处仍用 m3/km2 造成的体例不一致（对审后修编稿
+    尤其重要——体例统一属于全篇决策，不该由逐段改写顺手决定）。"""
+    changed = []
+    for sup, plain in (('²', '2'), ('³', '3')):
+        if sup not in original and sup in text:
+            text = text.replace(sup, plain)
+            changed.append(f'{sup}→{plain}')
+    return text, changed
+
+
+def dedupe_flags(flags):
+    """两遍可能提同一条疑点（措辞略有差异），保留信息量更大的一条。"""
+    import difflib
+    out = []
+    for f in flags:
+        dup = None
+        for i, kept in enumerate(out):
+            if f in kept or kept in f:
+                dup = i
+                break
+            if difflib.SequenceMatcher(None, f, kept).ratio() > 0.5:
+                dup = i
+                break
+        if dup is None:
+            out.append(f)
+        elif len(f) > len(out[dup]):
+            out[dup] = f
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('paragraphs')
@@ -43,6 +75,8 @@ def main():
     ap.add_argument('--lint', default='')
     ap.add_argument('--arb', default='')
     ap.add_argument('--adopt-lowconf', action='store_true')
+    ap.add_argument('--no-unit-consistency', action='store_true',
+                    help='关闭"单位体例跟随原文"（默认开启：原文无上标则还原 m³→m3、km²→km2）')
     args = ap.parse_args()
 
     paras = json.load(open(args.paragraphs, encoding='utf-8'))
@@ -100,10 +134,16 @@ def main():
         if fixed != orig and why in ('keep', 'lowconf-keep'):
             stats['仅lint自动修复'] += 1
             report['autofix_only'].append({'id': i, 'rules': applied})
+        if not args.no_unit_consistency:
+            fixed2, sup_changed = unify_unit_style(orig, fixed)
+            if sup_changed:
+                stats['单位体例还原'] += 1
+                report.setdefault('unit_style_reverted', []).append({'id': i, 'rules': sup_changed})
+                fixed = fixed2
 
         entry = {'id': i, 'paraIndex': p['paraIndex'], 'original': orig, 'newText': fixed}
         if flags:
-            entry['flag'] = '；'.join(dict.fromkeys(flags))
+            entry['flag'] = '；'.join(dedupe_flags(list(dict.fromkeys(flags))))
         merged.append(entry)
 
     json.dump(merged, open(args.out, 'w', encoding='utf-8'), ensure_ascii=False)

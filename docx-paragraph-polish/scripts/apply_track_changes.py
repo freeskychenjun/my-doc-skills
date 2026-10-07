@@ -174,6 +174,17 @@ def rewrite_paragraph(p, ops, chars, rev):
     return rev
 
 
+def restore_ws(p, prefix, suffix, core_chars):
+    """把段首/段尾原有空白按原格式写回（不产生修订，属排版留白）。"""
+    rpr = core_chars[0][1] if core_chars else None
+    ppr = p.find(f'{W}pPr')
+    pos = list(p).index(ppr) + 1 if ppr is not None else 0
+    if prefix:
+        p.insert(pos, make_run(prefix, rpr))
+    if suffix:
+        p.append(make_run(suffix, rpr))
+
+
 def add_flag_comment(doc, p, text):
     """在段落 p 上锚定一条 Word 批注（python-docx 只建内容，锚点需手写
     commentRangeStart/End + commentReference）。返回 True/False。"""
@@ -238,8 +249,17 @@ def main():
         if full_text.strip() != original.strip():
             skipped += 1; skip_reasons.append(f"id{r['id']} 段落含特殊内容,跳过"); continue
 
+        # 首尾空白（缩进/居中留白）原样保留，只在核心文本上做 diff：
+        # 否则 strip 后的 newText 与未 strip 的原文相比，会把段首空白当成"删除"写进修订。
+        core = full_text.strip()
+        prefix = full_text[:len(full_text) - len(full_text.lstrip())]
+        suffix = full_text[len(full_text.rstrip()):]
+        core_chars = chars[len(prefix):len(chars) - len(suffix)] if suffix else chars[len(prefix):]
+
         ai = new_text.strip()
-        ops = char_diff(full_text, ai)
+        if core == ai:
+            skipped += 1; skip_reasons.append(f"id{r['id']} 无差异"); continue
+        ops = char_diff(core, ai)
         if ops is None:
             skipped += 1; skip_reasons.append(f"id{r['id']} 段落过长,diff跳过"); continue
         if all(op == 'equal' for op, _ in ops):
@@ -249,7 +269,9 @@ def main():
             skipped += 1; skip_reasons.append(f"id{r['id']} 改动过大({ratio:.0%}),跳过"); continue
 
         try:
-            rev = rewrite_paragraph(p, ops, chars, rev)
+            rev = rewrite_paragraph(p, ops, core_chars, rev)
+            if prefix or suffix:
+                restore_ws(p, prefix, suffix, core_chars)
             written += 1
         except Exception as e:
             skipped += 1; skip_reasons.append(f"id{r['id']} 写入失败:{e}")
