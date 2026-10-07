@@ -35,9 +35,26 @@ python <skill目录>/scripts/extract_body_paragraphs.py "<docx路径>" ["<输出
 
 脚本自动排除（与原 BodyParagraphFilter 规则一致）：标题（大纲级别/标题样式/编号/章节模式）、表格内段落、图名/表名、含图片/形状/域代码的段落、空段落。默认输出 `<docx同目录>/<文件名>-paragraphs.json`，元素形如 `{"id":1,"paraIndex":3,"text":"……"}`。
 
-### 第 3 步：逐段改写（由你完成，不调外部 API）
+### 第 3 步：确定性预检（lint，先于任何模型改写）
 
-读取 paragraphs.json，**对每一段原文按下面的规则改写**，产出 rewrites JSON。
+```bash
+python <skill目录>/scripts/lint_paragraphs.py "<paragraphs.json>" ["<输出lint.json>"]
+```
+
+用错别字映射表 + 正则规则扫出**确定性机械问题**（进人→进入、机率→几率、Km→km、半角标点、数字单位间空格等）。产出：
+
+- `paragraphs-lint.json`：逐段问题清单（规则/位置/片段/建议）——**附进第 4 步改写 prompt**，模型只需确认执行，把注意力留给表达层；
+- 其中"零风险规则"（错别字映射、单位大小写、空格类）在合并阶段由 `auto_fix` **自动应用**，不依赖模型。
+
+规则表在脚本头部（TYPO_MAP / REGEX_RULES），按项目积累直接往里加条目。
+
+### 第 4 步：改写（默认 2 遍 + 仲裁；由你完成，不调外部 API）
+
+同一段提示词对同一模型跑两遍结果会有明显漂移（实测单遍仅捕获约 35% 可发现问题，两遍并集约 85%），因此**默认跑 2 遍独立改写**：
+
+- 每遍产出 rewrites JSON（格式见下）；长文档每遍都按分片并行（见"长文档并行"）；
+- 两遍可用相同 prompt（靠采样随机性），也可第二遍附加 lint 清单做侧重点差异；
+- 用户明确要求省 Token 时可降为 1 遍（召回率下降需告知）。
 
 改写硬性约束（两种模式共同的红线，违反任何一条都会导致该段被跳过或污染文档）：
 
@@ -74,10 +91,26 @@ python <skill目录>/scripts/extract_body_paragraphs.py "<docx路径>" ["<输出
 
 短文档（≲60 段）不值得派发开销，直接由父代理自己改写。
 
-### 第 4 步：以修订模式写回
+### 第 5 步：合并投票 + 仲裁
 
 ```bash
-python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<rewrites.json路径>" [polish|logic] ["<输出docx路径>"]
+python <skill目录>/scripts/merge_passes.py "<paragraphs.json>" -o "<merged.json>" \
+    --passes "<pass1.json>" "<pass2.json>" [--arb "<arb.json>"]
+```
+
+合并策略（脚本自动执行）：
+
+1. **≥2 遍改出完全相同文本 → 采纳**（高置信）；
+2. **都改但文本不同 → 冲突**；**仅 1 遍改 → 低置信**（默认保持原文）。冲突段和低置信段输出到 `*.merge-report.json`；
+3. **仲裁遍**（轻量，只处理冲突+低置信段，约为全程 1/10 成本）：你阅读 merge-report 中的候选改文，逐段裁定——真错误选最优候选（或最小 diff 版本，改动最小者最可能是纯纠错）、可改可不改的弃改、疑似事实问题写 flag——写成 `arb.json`（`[{"id":..,"newText":..,"flag"?}]`）重新跑 merge 带 `--arb`；
+4. 所有段落最后叠加 `auto_fix` 零风险修复（lint 的确定性部分）。
+
+仲裁时注意：候选里**方向改反的**要否决（实测出现过某遍把"为"改回"是"）；diff 最小的候选通常最安全。
+
+### 第 6 步：以修订模式写回
+
+```bash
+python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<merged.json路径>" [polish|logic] ["<输出docx路径>"]
 ```
 
 脚本行为：
@@ -89,7 +122,7 @@ python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<rewrites.js
 
 ### 收尾汇报
 
-向用户报告：总段数、写入修订 N 段、跳过 M 段（跳过原因分组）、批注 K 条；输出文件路径；提醒用户在 Word/WPS 中打开后用「审阅→修订→接受/拒绝」逐条审阅，疑点批注处理完后手动删除。对跳过的段落给出原文与你的改写建议，让用户自行决定是否手动替换。
+向用户报告：总段数、两遍投票采纳/冲突仲裁/低置信分布、写入修订 N 段、跳过 M 段（跳过原因分组）、lint 自动修复 X 段、批注 K 条；输出文件路径；提醒用户在 Word/WPS 中打开后用「审阅→修订→接受/拒绝」逐条审阅，疑点批注处理完后手动删除。对跳过的段落给出原文与你的改写建议，让用户自行决定是否手动替换。
 
 ## 已知边界
 
