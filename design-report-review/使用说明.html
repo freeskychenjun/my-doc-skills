@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>报告智能校审 · 用户使用说明</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --brand:#6c5ce7; --brand2:#a855f7; --brand3:#7c3aed;
+  --pass:#10b981; --partial:#f59e0b; --fail:#ef4444; --na:#9ca3af;
+  --ink:#1a1a2e; --txt:#333; --mut:#888; --line:#eee; --bg:#f5f7fa; --card:#fff;
+}
+body { font-family:"Microsoft YaHei","PingFang SC","Helvetica Neue",Arial,sans-serif;
+       line-height:1.7; color:var(--txt); background:var(--bg); }
+a { color:var(--brand); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code, pre { font-family:ui-monospace,"Consolas","Courier New",monospace; }
+code { background:#eef1f5; padding:1px 6px; border-radius:4px; font-size:90%; color:#5b3fb8; }
+pre { background:#1e1e2e; color:#e6e6e6; padding:16px 18px; border-radius:10px;
+      overflow-x:auto; font-size:13px; line-height:1.55; margin:10px 0; box-shadow:0 4px 14px rgba(0,0,0,.12); }
+pre code { background:transparent; padding:0; color:inherit; font-size:inherit; }
+
+/* Header */
+.header { background:linear-gradient(135deg,#6c5ce7,#a855f7,#7c3aed); color:#fff;
+          padding:42px 60px; box-shadow:0 4px 20px rgba(108,92,231,.3); }
+.header .eyebrow { font-size:13px; opacity:.85; letter-spacing:2px; text-transform:uppercase; }
+.header h1 { font-size:30px; font-weight:700; margin:6px 0 4px; }
+.header .sub { font-size:14.5px; opacity:.92; max-width:820px; }
+.header .badges { margin-top:16px; display:flex; gap:10px; flex-wrap:wrap; }
+.header .badges span { background:rgba(255,255,255,.18); border:1px solid rgba(255,255,255,.32);
+                       padding:4px 13px; border-radius:999px; font-size:12.5px; backdrop-filter:blur(4px); }
+
+/* Layout */
+.container { max-width:1240px; margin:0 auto; padding:24px 20px 70px; display:flex; gap:24px; }
+.sidebar { width:236px; flex-shrink:0; position:sticky; top:18px;
+           max-height:calc(100vh - 36px); overflow-y:auto; background:var(--card);
+           border-radius:12px; padding:16px 12px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
+.sidebar h3 { font-size:12.5px; color:var(--mut); margin:0 0 10px 6px;
+              padding-bottom:8px; border-bottom:1px solid var(--line); letter-spacing:1px; }
+.sidebar ul { list-style:none; }
+.sidebar ul li a { display:block; padding:7px 11px; font-size:13px; color:#555;
+                   border-radius:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+                   transition:all .2s; }
+.sidebar ul li a:hover { background:#f0eeff; color:var(--brand); text-decoration:none; }
+.sidebar ul li a.active { background:var(--brand); color:#fff; }
+.main { flex:1; min-width:0; }
+
+/* Section cards */
+.section { background:var(--card); border-radius:12px; padding:28px 34px;
+           margin-bottom:20px; box-shadow:0 2px 12px rgba(0,0,0,.06); scroll-margin-top:18px; }
+.section h2 { font-size:21px; color:var(--ink); margin-bottom:6px; padding-bottom:8px;
+              border-bottom:2px solid var(--brand); display:flex; align-items:center; gap:10px; }
+.section h2 .ico { display:inline-flex; width:30px; height:30px; border-radius:8px;
+                   background:linear-gradient(135deg,var(--brand),var(--brand2)); color:#fff;
+                   align-items:center; justify-content:center; font-size:15px; font-weight:700; }
+.section h3 { font-size:16px; color:var(--ink); margin:22px 0 8px; }
+.section p { margin:8px 0; }
+.section ul, .section ol { margin:8px 0 8px 22px; }
+.section li { margin:5px 0; }
+.lead { font-size:14.5px; color:#555; }
+
+/* Feature cards */
+.features { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px; margin-top:14px; }
+.feature { border:1px solid var(--line); border-radius:10px; padding:16px 18px; background:#fbfbff; }
+.feature .ft-ico { font-size:20px; }
+.feature h4 { font-size:14.5px; color:var(--brand3); margin:6px 0 4px; }
+.feature p { font-size:13px; color:#666; margin:0; }
+
+/* Flow diagram */
+.flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:0; margin:14px 0 6px; }
+.flow .step { flex:1; min-width:150px; background:#faf8ff; border:1px solid #e5e0ff;
+              border-radius:10px; padding:14px 14px; position:relative; }
+.flow .step .n { display:inline-block; width:24px; height:24px; line-height:24px; text-align:center;
+                 background:var(--brand); color:#fff; border-radius:50%; font-size:12px; font-weight:700; }
+.flow .step h5 { font-size:14px; color:var(--ink); margin:6px 0 4px; }
+.flow .step p { font-size:12px; color:#777; margin:0; }
+.flow .arrow { display:flex; align-items:center; justify-content:center; width:28px;
+               color:var(--brand); font-size:18px; font-weight:700; }
+
+/* Tables */
+.tbl { width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }
+.tbl th { background:#f8f7ff; color:var(--brand3); padding:9px 11px; text-align:left;
+          border-bottom:2px solid #e5e0ff; font-weight:600; }
+.tbl td { padding:9px 11px; border-bottom:1px solid #f0f0f0; vertical-align:top; }
+.tbl tr:hover td { background:#fafbff; }
+.tbl td code { font-size:12px; }
+
+/* Category cards */
+.cats { display:grid; grid-template-columns:1fr; gap:12px; margin-top:14px; }
+.cat { border:1px solid var(--line); border-radius:10px; padding:14px 18px; border-left:4px solid var(--brand); }
+.cat .ch { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.cat .ch h4 { font-size:15px; color:var(--ink); }
+.cat .ch .cnt { font-size:12px; color:#fff; background:var(--brand); padding:2px 9px; border-radius:999px; }
+.cat .ch .src { font-size:12px; color:var(--mut); }
+.cat ul { margin:8px 0 0 18px; font-size:12.5px; color:#666; }
+.cat ul li { margin:3px 0; }
+.cat ul li b { color:var(--ink); font-weight:600; }
+
+/* Badges */
+.badge { font-size:12px; font-weight:600; padding:2px 10px; border-radius:999px; white-space:nowrap; }
+.v-pass { background:#e8f5e9; color:#1b8a3a; border:1px solid #c8e6c9; }
+.v-partial { background:#fff3e0; color:#e65100; border:1px solid #ffe0b2; }
+.v-fail { background:#ffebee; color:#c62828; border:1px solid #ffcdd2; }
+.v-na { background:#f0f0f0; color:#666; border:1px solid #e3e3e3; }
+
+/* Callouts */
+.note { border-left:4px solid var(--brand2); background:#faf6ff; padding:12px 16px;
+        border-radius:0 8px 8px 0; margin:14px 0; font-size:13.5px; }
+.note b { color:var(--brand3); }
+.warn { border-left:4px solid var(--fail); background:#fff5f5; padding:12px 16px;
+        border-radius:0 8px 8px 0; margin:14px 0; font-size:13.5px; }
+.warn b { color:#c62828; }
+.tip { border-left:4px solid var(--pass); background:#f0fdf4; padding:12px 16px;
+       border-radius:0 8px 8px 0; margin:14px 0; font-size:13.5px; }
+.tip b { color:#1b8a3a; }
+
+/* Report preview mock */
+.mock { border:1px solid var(--line); border-radius:10px; overflow:hidden; margin:14px 0; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+.mock .m-banner { background:linear-gradient(135deg,#6c5ce7,#a855f7,#7c3aed); color:#fff; padding:16px 22px; }
+.mock .m-banner h5 { font-size:16px; }
+.mock .m-banner .m-meta { font-size:11.5px; opacity:.9; margin-top:6px; }
+.mock .m-stats { display:flex; gap:10px; padding:12px 16px; background:#fff; flex-wrap:wrap; }
+.mock .m-stat { flex:1; min-width:90px; text-align:center; }
+.mock .m-stat .num { font-size:18px; font-weight:700; }
+.mock .m-stat .lbl { font-size:11px; color:var(--mut); }
+.mock .m-row { display:flex; gap:8px; padding:0 16px 10px; font-size:11.5px; }
+.mock .m-row .m-fbtn { padding:3px 10px; border:1px solid #ddd; border-radius:999px; }
+.mock .m-row .m-fbtn.on { background:var(--brand); color:#fff; border-color:var(--brand); }
+
+.footer { text-align:center; color:#9aa0a6; font-size:12.5px; padding:18px 0 8px; }
+@media print {
+  .sidebar, .header .badges { display:none; }
+  .section { box-shadow:none; break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="eyebrow">Claude Code Skill · design-report-review</div>
+  <h1>报告智能校审 · 用户使用说明</h1>
+  <div class="sub">面向水利工程设计报告（项目建议书 / 可研 / 初设等 Word 文档）的逐条、可追溯智能校审工具，覆盖 <b>8 大类 42 条</b>检查要求，输出仪表板式校审报告。</div>
+  <div class="badges">
+    <span>📁 支持 .docx / .doc</span>
+    <span>🧩 确定性脚本 + 语义判断</span>
+    <span>📊 默认仪表板 HTML</span>
+    <span>🔢 42 条全覆盖</span>
+    <span>🔤 上下标正确渲染</span>
+    <span>🌐 跨平台可迁移</span>
+  </div>
+</div>
+
+<div class="container">
+
+<aside class="sidebar" id="toc">
+  <h3>目录导航</h3>
+  <ul id="toc-list">
+    <li><a href="#overview">一、技能概述</a></li>
+    <li><a href="#features">二、核心特性</a></li>
+    <li><a href="#coverage">三、检查范围（42 条）</a></li>
+    <li><a href="#how">四、工作原理</a></li>
+    <li><a href="#quick">五、快速开始</a></li>
+    <li><a href="#manual">六、手动分步运行</a></li>
+    <li><a href="#output">七、输出报告说明</a></li>
+    <li><a href="#env">八、环境与依赖</a></li>
+    <li><a href="#platform">九、跨平台运行表现</a></li>
+    <li><a href="#layout">十、目录结构</a></li>
+    <li><a href="#maintain">十一、清单动态维护</a></li>
+    <li><a href="#faq">十二、常见问题与边界</a></li>
+  </ul>
+</aside>
+
+<div class="main">
+
+<!-- 一、概述 -->
+<section class="section" id="overview">
+  <h2><span class="ico">1</span> 技能概述</h2>
+  <p class="lead"><b>报告智能校审</b>（skill 标识：<code>design-report-review</code>）对一份水利工程设计报告执行<b>逐条、可追溯</b>的智能校审。它严格依照 <code>references/检查要求.md</code> 中定义的 <b>8 大类 42 条</b>检查要求，并按其「检查结果输出要求」产出校审报告：</p>
+  <ul>
+    <li><b>一一对应、不遗漏</b>：42 条全部输出，即使某条全部符合也写出主要分析结论。</li>
+    <li><b>引用完整要求原文</b>：每条结论前附该条要求全文，便于读者将结论与要求对比。</li>
+    <li><b>可追溯定位</b>：每个结论与问题都标注文档中的定位（Word 页码 / 表号 / 题录），并精确照抄原文片段作为依据。</li>
+    <li><b>默认输出 HTML</b>：仪表板式（顶部横幅 + 左侧目录 + KPI 统计 + 问题筛选 + 行级配色表格）；用户明确要求 Markdown 时输出 Markdown。</li>
+  </ul>
+  <div class="note"><b>设计要点：</b> <b>确定性脚本</b>负责抽取与机器可验证的硬证据（数值、引用对照、表格核算、编号顺序），<b>并行 subagent</b> 负责语义判断（条文落实、一致性、语法、合理性）。二者结合，既严谨又高效。</div>
+</section>
+
+<!-- 二、核心特性 -->
+<section class="section" id="features">
+  <h2><span class="ico">2</span> 核心特性</h2>
+  <div class="features">
+    <div class="feature"><div class="ft-ico">🎯</div><h4>逐条对应不遗漏</h4><p>以 requirements.json 为序遍历全部 42 条，缺失项自动补查，确保全覆盖。</p></div>
+    <div class="feature"><div class="ft-ico">🤖</div><h4>确定性 + 语义混合</h4><p>数值/对照/编号交给脚本（零臆测），条文落实/一致性/语法交给语义判断（优先引用机器证据）。</p></div>
+    <div class="feature"><div class="ft-ico">⚡</div><h4>并行高效</h4><p>4 组 fan-out 并行 subagent（每组只读裁剪后切片 &lt;2 万 token）+ 4 条纯规则脚本直出，墙钟提速 50~70%。</p></div>
+    <div class="feature"><div class="ft-ico">📍</div><h4>精确可追溯</h4><p>每条问题给出定位（第N页/表号）、原文照抄、问题类型与逐字修改建议。</p></div>
+    <div class="feature"><div class="ft-ico">📊</div><h4>仪表板式报告</h4><p>KPI 卡 + 筛选（全部/仅问题/仅不符合）+ 行级配色，浏览器直接打开、支持打印归档。</p></div>
+    <div class="feature"><div class="ft-ico">🔤</div><h4>上下标正确渲染</h4><p>m³/s、10⁸、km²、H₂O、SO₄ 等在 HTML 与 Markdown 中均正确显示。</p></div>
+    <div class="feature"><div class="ft-ico">🧮</div><h4>表格自动核算</h4><p>行/列合计、平均值、百分比、最大最小值逐项机器核算，异常只提示不误判。</p></div>
+    <div class="feature"><div class="ft-ico">🔁</div><h4>规则可替换</h4><p>references/ 下清单可替换为其他行业/版本，索引自动重建，便于移植。</p></div>
+  </div>
+</section>
+
+<!-- 三、检查范围 -->
+<section class="section" id="coverage">
+  <h2><span class="ico">3</span> 检查范围（8 大类 42 条）</h2>
+  <p class="lead">校审依据 <code>检查要求.md</code>，并对照 <code>水利标准.md</code>（标准现行有效清单）与 <code>法律法规.md</code>（法规现行有效清单）进行核对。</p>
+  <table class="tbl">
+    <thead><tr><th style="width:8%">序</th><th>大类</th><th>编号区间</th><th>条数</th><th>主要数据来源</th></tr></thead>
+    <tbody>
+      <tr><td>一</td><td>强制性条文检查</td><td><code>mp_001–011</code></td><td>11</td><td>全文（语义判断条文落实）</td></tr>
+      <tr><td>二</td><td>常见设计问题检查</td><td><code>ci_*</code></td><td>9</td><td>全文 + 排涝模数数值</td></tr>
+      <tr><td>三</td><td>一致性检查</td><td><code>cons_001–003</code></td><td>3</td><td>全文 + 表格 + 数值</td></tr>
+      <tr><td>四</td><td>语法表述检查</td><td><code>gram_001–008</code></td><td>8</td><td>全文 + 题录</td></tr>
+      <tr><td>五</td><td>文字规范性检查</td><td><code>std_001–004</code></td><td>4</td><td>机器证据 det_numbers</td></tr>
+      <tr><td>六</td><td>设计标准检查</td><td><code>ds_001–002</code></td><td>2</td><td>det_citations + 标准索引</td></tr>
+      <tr><td>七</td><td>法律法规检查</td><td><code>lr_001–002</code></td><td>2</td><td>det_citations + 法规索引</td></tr>
+      <tr><td>八</td><td>表格逻辑关系专项检查</td><td><code>tbl_001–003</code></td><td>3</td><td>表格网格 + det_table</td></tr>
+    </tbody>
+  </table>
+
+  <h3>各类检查项明细</h3>
+  <div class="cats">
+
+    <div class="cat">
+      <div class="ch"><h4>一、强制性条文检查</h4><span class="cnt">11 条</span><span class="src">mp_001–011 · 主要依据《设计洪水计算规范》《水文计算规范》</span></div>
+      <ul>
+        <li><b>mp_001 设计洪水计算过程检查</b> — 基本资料/方法/参数/成果多方面分析检查论证合理性</li>
+        <li><b>mp_002 暴雨洪水潮位资料检查</b> — 资料合理性检查与重点复核（水尺零点等）</li>
+        <li><b>mp_003 洪水系列一致性检查</b> — 受工程/河道整治影响时统一到同一基础</li>
+        <li><b>mp_004 插补延长资料合理性检查</b></li>
+        <li><b>mp_005 历史洪水暴雨潮位资料检查</b> — 复核洪峰流量、补充调查考证</li>
+        <li><b>mp_006 分期设计洪水重现期考证</b></li>
+        <li><b>mp_007 产流汇流参数率定</b></li>
+        <li><b>mp_008 设计暴雨洪水成果合理性检查</b></li>
+        <li><b>mp_009 水文计算资料可靠性评价</b></li>
+        <li><b>mp_010 水位流量关系高程系统一致性</b></li>
+        <li><b>mp_011 水位流量关系曲线外延要求</b></li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>二、常见设计问题检查</h4><span class="cnt">9 条</span><span class="src">ci_flood / ci_runoff / ci_stage / ci_water / ci_drainage</span></div>
+      <ul>
+        <li><b>ci_flood_001</b> 设计洪水成果合理性分析</li>
+        <li><b>ci_runoff_001</b> 径流设计参证站三性分析（应对参证站而非坝址）</li>
+        <li><b>ci_runoff_002</b> 水文比拟法修正方法（用面雨量比值而非径流深比值）</li>
+        <li><b>ci_stage_001</b> 无实测资料时水位流量关系拟定</li>
+        <li><b>ci_stage_002</b> 利用洪痕分析水位流量关系</li>
+        <li><b>ci_water_001</b> 水面线计算影响因素说明</li>
+        <li><b>ci_water_002</b> 阻水建筑物壅水计算</li>
+        <li><b>ci_water_003</b> 水面线成果合理性分析</li>
+        <li><b>ci_drainage_001</b> 排涝模数合理性分析（5/10/20 年一遇各分区模数区间）</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>三、一致性检查</h4><span class="cnt">3 条</span><span class="src">cons_001–003</span></div>
+      <ul>
+        <li><b>cons_001</b> 前后说法一致性</li>
+        <li><b>cons_002</b> 正文数据一致性（前后正文数据）</li>
+        <li><b>cons_003</b> 正文与表格数据一致性</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>四、语法表述检查</h4><span class="cnt">8 条</span><span class="src">gram_001–008</span></div>
+      <ul>
+        <li><b>gram_001</b> 语法错误 · <b>gram_002</b> 标点符号 · <b>gram_003</b> 文字通顺性</li>
+        <li><b>gram_004</b> 文字表达歧义 · <b>gram_005</b> 常识性错误 · <b>gram_006</b> 内容逻辑错误</li>
+        <li><b>gram_007</b> 图表编号错误（格式一致性 + 前后逻辑）</li>
+        <li><b>gram_008</b> "张冠李戴"问题（生搬硬套、混淆项目名称）</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>五、文字规范性检查</h4><span class="cnt">4 条</span><span class="src">std_001–004 · 依据 det_numbers</span></div>
+      <ul>
+        <li><b>std_001</b> 大数值单位使用规范（亿/百万/万 或 10⁸/10⁶/10⁴，同一报告只用一种）</li>
+        <li><b>std_002</b> 符号名称与符号使用规范</li>
+        <li><b>std_003</b> 流量数值保留规范（3 位有效数字，小数点后不超过 3 位）</li>
+        <li><b>std_004</b> 工程等别和级别数字书写（等别用罗马数字、级别用阿拉伯数字等）</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>六、设计标准检查</h4><span class="cnt">2 条</span><span class="src">ds_001–002 · 依据 det_citations + 标准索引</span></div>
+      <ul>
+        <li><b>ds_001</b> 标准编号与名称正确性检查（格式规范、名称完整、是否已废止/更新）</li>
+        <li><b>ds_002</b> 标准引用一致性检查（同一标准不同位置是否前后一致）</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>七、法律法规检查</h4><span class="cnt">2 条</span><span class="src">lr_001–002 · 依据 det_citations + 法规索引</span></div>
+      <ul>
+        <li><b>lr_001</b> 法律法规编号与名称正确性检查</li>
+        <li><b>lr_002</b> 法律法规引用一致性检查</li>
+      </ul>
+    </div>
+
+    <div class="cat">
+      <div class="ch"><h4>八、表格逻辑关系专项检查</h4><span class="cnt">3 条</span><span class="src">tbl_001–003 · 依据表格网格 + det_table</span></div>
+      <ul>
+        <li><b>tbl_001</b> 统计值检查（行/列合计、小计与总计、平均值、百分比、最大最小值）</li>
+        <li><b>tbl_002</b> 异常值检查</li>
+        <li><b>tbl_003</b> 逻辑关系检查（行间/列间逻辑合理性）</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <h3>判定口径</h3>
+  <table class="tbl">
+    <thead><tr><th>结果</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><span class="badge v-pass">符合</span></td><td>报告完整满足该要求（仍写出主要分析结论）。</td></tr>
+      <tr><td><span class="badge v-partial">部分符合</span></td><td>基本满足但存在不足/疏漏。</td></tr>
+      <tr><td><span class="badge v-fail">不符合</span></td><td>存在明确问题或缺失。</td></tr>
+      <tr><td><span class="badge v-na">不适用</span></td><td>该要求不适用于本文档（须说明原因）。</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 四、工作原理 -->
+<section class="section" id="how">
+  <h2><span class="ico">4</span> 工作原理</h2>
+  <p class="lead">校审分为 <b>6 个步骤</b>：抽取 → 确定性证据 → 切片+直出 → 并行语义 → 收集润色 → 合成报告。前三步与最后一步为确定性脚本，中间为并行语义判断。</p>
+
+  <div class="flow">
+    <div class="step"><span class="n">1</span><h5>抽取</h5><p>extract_docx.py / com_docx_extract.py：docx → 全文/表格/题录/引用/数值，重建合并单元格。</p></div>
+    <div class="arrow">▶</div>
+    <div class="step"><span class="n">2</span><h5>确定性检查</h5><p>deterministic_checks.py：表格核算、引用对照、有效数字、编号顺序 → det_*.json。</p></div>
+    <div class="arrow">▶</div>
+    <div class="step"><span class="n">2b</span><h5>切片+直出</h5><p>slice_artifacts.py 按4组裁剪产物；det_findings.py 直出 4 条结论（std_001/003/004、gram_007），不派 LLM。</p></div>
+    <div class="arrow">▶</div>
+    <div class="step"><span class="n">3</span><h5>并行语义检查</h5><p>4 组 subagent（A强条+常见/B一致性+表格/C语法+文字/D标准+法规）各读切片，墙钟≈最慢一组。</p></div>
+    <div class="arrow">▶</div>
+    <div class="step"><span class="n">4</span><h5>收集+润色</h5><p>collect_findings.py 合并（det 覆盖 subagent，42 条全覆盖）；polish_findings.py 去机器黑话。</p></div>
+    <div class="arrow">▶</div>
+    <div class="step"><span class="n">5</span><h5>合成报告</h5><p>assemble_report.py：逐条对应 + 引用原文 + 行级配色，默认 HTML，det 条目标注"（机器判定）"。</p></div>
+  </div>
+
+  <h3>为什么是「确定性 + 语义」混合？</h3>
+  <table class="tbl">
+    <thead><tr><th>环节</th><th>由谁负责</th><th>负责什么</th><th>原则</th></tr></thead>
+    <tbody>
+      <tr><td>硬证据</td><td>确定性脚本</td><td>数值核算、引用有效性对照、有效数字、编号顺序</td><td>宁可漏报（留给语义）也不误报</td></tr>
+      <tr><td>纯规则直出</td><td>det_findings.py</td><td>std_001/003/004、gram_007 四条（数数/查表/加法）</td><td>脚本比 LLM 更准，不经 subagent</td></tr>
+      <tr><td>语义判断</td><td>并行 subagent（4 组）</td><td>条文是否落实、前后一致性、语法合理性、规范合理性</td><td>强制引用原文定位与机器证据，禁止臆测</td></tr>
+      <tr><td>合成</td><td>assemble_report.py</td><td>结构与引文来自脚本，结论与依据来自语义</td><td>以 requirements.json 为序，逐条对应不遗漏</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip"><b>证据优先：</b>凡 det_*.json 已给出的结论（如 std_003 流量有效数字、ds 标准有效性、gram_007 编号格式不一致），subagent 直接引用、不重复人工核算，避免误判。</div>
+  <div class="note"><b>提速要点：</b>4 组并行（从原 7~8 组合并而来）+ 每组只读裁剪后切片（&lt;2 万 token，而非全文 8 万 token）+ 4 条纯规则不经 LLM，整体墙钟提速 50~70%。</div>
+</section>
+
+<!-- 五、快速开始 -->
+<section class="section" id="quick">
+  <h2><span class="ico">5</span> 快速开始</h2>
+  <p class="lead">最简单的用法：把本技能目录置于 <code>.claude/skills/design-report-review/</code>，然后在 Claude Code 对话中直接说：</p>
+
+  <pre><code>用报告智能校审技能检查 安徽两湖涝区项建第2、3、5章.docx</code></pre>
+
+  <p>Claude 会读取 <code>SKILL.md</code> 并自动执行抽取 → 确定性检查 → 并行语义检查 → 合成报告全流程。</p>
+
+  <h3>输出位置</h3>
+  <ul>
+    <li><b>默认（HTML）</b>：在<b>输入文档同目录</b>生成 <code>&lt;文档名&gt;_校审报告.html</code>，浏览器直接打开。</li>
+    <li><b>指定 Markdown</b>：明确说"输出 Markdown"时生成 <code>&lt;文档名&gt;_校审报告.md</code>。</li>
+  </ul>
+
+  <h3>常用对话指令示例</h3>
+  <table class="tbl">
+    <thead><tr><th>你想做的事</th><th>怎么说</th></tr></thead>
+    <tbody>
+      <tr><td>默认 HTML 校审报告</td><td><code>用报告智能校审检查 报告.docx</code></td></tr>
+      <tr><td>要 Markdown 版</td><td><code>用报告智能校审检查 报告.docx，输出 Markdown</code></td></tr>
+      <tr><td>两种格式都要</td><td><code>用报告智能校审检查 报告.docx，HTML 和 Markdown 都输出</code></td></tr>
+      <tr><td>带 Word 页码定位（需 Windows+Word）</td><td><code>检查 报告.docx，并把段落定位转成 Word 页码</code></td></tr>
+    </tbody>
+  </table>
+
+  <div class="note"><b>首次运行：</b>若 <code>scripts/references_index.json</code> 或 <code>scripts/requirements.json</code> 缺失，Claude 会先自动运行 <code>build_reference_index.py</code> 与 <code>parse_requirements.py</code> 建索引，无需手动干预。</div>
+  <div class="tip"><b>用其他 agent 平台？</b>本技能默认面向 Claude Code。若想在 Codex / opencode / pi agent 上运行，参见 <a href="#platform">九、跨平台运行表现</a>。</div>
+</section>
+
+<!-- 六、手动分步运行 -->
+<section class="section" id="manual">
+  <h2><span class="ico">6</span> 手动分步运行</h2>
+  <p class="lead">便于调试、复现或单独调用某一环节。技能根目录记为 <code>$SKILL</code>。</p>
+
+  <h3>0）建索引与解析要求（仅首次或清单更新后）</h3>
+<pre><code>cd "$SKILL"
+python scripts/maintain.py --force   # 一键重建 references_index.json + requirements.json</code></pre>
+
+  <h3>1）抽取 docx 为结构化 artifacts</h3>
+<pre><code>python "$SKILL/scripts/extract_docx.py" "&lt;docx或doc路径&gt;" ["&lt;输出目录&gt;"]</code></pre>
+  <p>默认输出到 <code>$SKILL/_run/&lt;文档名去后缀&gt;/</code>，生成 <code>fulltext.md / tables.json / captions.json / citations.json / numbers.json / meta.json / locators.json</code>。<code>.doc</code> 会自动尝试转换；若环境有数据安全软件（如 Agile DGS）拦截 Word 写盘导致转换文件被加密，改用 <code>com_docx_extract.py</code> 内存直读绕过。</p>
+
+  <h3>1b）Word 页码定位（可选，需 Windows + Word）</h3>
+<pre><code>python "$SKILL/scripts/page_map.py" "$SKILL/_run/&lt;文档名&gt;"</code></pre>
+  <p>用 Word COM 计算每个段落对应的 Word 页码，回填 <code>locators.json</code>。无 Word 时跳过，定位自动回退为「章节标题§」。</p>
+
+  <h3>2）确定性检查（机器可验证证据）</h3>
+<pre><code>python "$SKILL/scripts/deterministic_checks.py" "$SKILL/_run/&lt;文档名&gt;"</code></pre>
+  <p>产出四份 <code>det_*.json</code> 证据并打印摘要。<b>这些证据是数值类、对照类检查的权威依据，语义 subagent 必须优先引用。</b>流量有效数字按 SL/T 247 规范判定（整数末尾零不算有效数字）。</p>
+
+  <h3>2b）按组切片 + 直出 4 条结论（提速提质核心）</h3>
+<pre><code>python "$SKILL/scripts/slice_artifacts.py" "$SKILL/_run/&lt;文档名&gt;"   # 按4组裁剪 → _slices/groupA..D.json
+python "$SKILL/scripts/det_findings.py" "$SKILL/_run/&lt;文档名&gt;"        # 直出 std_001/003/004、gram_007 四条</code></pre>
+  <p>切片让每个 subagent 只读裁剪后的小文件（&lt;2 万 token），而非全文；4 条纯规则条目由脚本直接出结论，<b>不派 subagent</b>。</p>
+
+  <h3>3）并行语义检查（由 Claude fan-out 4 个 subagent）</h3>
+  <p>一条消息内并发 4 个 subagent，每个只读对应切片，互不阻塞，墙钟≈最慢一组。各写 <code>groupX.json</code>。</p>
+  <table class="tbl">
+    <thead><tr><th>组</th><th>检查项</th><th>条数</th><th>读切片</th><th>附 det 证据（已在切片内）</th></tr></thead>
+    <tbody>
+      <tr><td>A</td><td>强条 mp_001–011 + 常见 ci_*</td><td>20</td><td>groupA.json</td><td>det_std003_brief</td></tr>
+      <tr><td>B</td><td>一致性 cons_001–003 + 表格 tbl_001–003</td><td>6</td><td>groupB.json</td><td>det_table_brief</td></tr>
+      <tr><td>C</td><td>语法 gram_001–006/008 + 文字 std_002</td><td>8</td><td>groupC.json</td><td>det_numbering、det_std004_grade</td></tr>
+      <tr><td>D</td><td>标准 ds_001–002 + 法规 lr_001–002</td><td>4</td><td>groupD.json</td><td>det_citations_brief</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>不派 subagent 的 4 条：</b>std_001（大数单位）、std_003（流量有效数字）、std_004（等别级别）、gram_007（图表编号）——由 2b 步 <code>det_findings.py</code> 直接生成结论，在 4 步合并时并入。</div>
+
+  <h3>4）收集 + 合并 + 校验</h3>
+<pre><code>python "$SKILL/scripts/collect_findings.py" "$SKILL/_run/&lt;文档名&gt;"</code></pre>
+  <p>收集 4 组 subagent 产物 + det_findings，<b>det 覆盖同 id 的 subagent 结果</b>，对照 requirements.json 确保 42 条全覆盖（缺失按"未检出"占位）。</p>
+
+  <h3>4b）结论润色（去机器黑话）</h3>
+<pre><code>python "$SKILL/scripts/polish_findings.py" "$SKILL/_run/&lt;文档名&gt;"</code></pre>
+  <p>subagent 偶尔会把切片里的字段名（<code>det_citations_brief.summary</code>、<code>consistency_issues=0</code>、<code>grid_omitted</code> 等）照抄进结论。本脚本翻译成自然语言，并清理"本组切片"等暴露内部实现的措辞。<b>必须在 collect 之后、assemble 之前运行。</b></p>
+
+  <h3>5）合成报告</h3>
+<pre><code>python "$SKILL/scripts/assemble_report.py" "$SKILL/_run/&lt;文档名&gt;"             # 默认 HTML
+python "$SKILL/scripts/assemble_report.py" "$SKILL/_run/&lt;文档名&gt;" --format=md   # 只要 Markdown
+python "$SKILL/scripts/assemble_report.py" "$SKILL/_run/&lt;文档名&gt;" --format=both # 两者都出</code></pre>
+  <p>合成时内置 det 双保险（det_findings 覆盖优先），det 来源条目标注"（机器判定）"。</p>
+</section>
+
+<!-- 七、输出报告说明 -->
+<section class="section" id="output">
+  <h2><span class="ico">7</span> 输出报告说明</h2>
+  <p class="lead">严格遵守 <code>检查要求.md</code> 的「检查结果输出要求」：与要求一一对应不遗漏、引用完整要求原文、即使符合也写主要分析结论。</p>
+
+  <h3>HTML 仪表板（默认）</h3>
+  <div class="mock">
+    <div class="m-banner">
+      <h5>智能校审报告 — 《文档名》</h5>
+      <div class="m-meta">文件：xxx.docx · 段落：1650 · 表格：98 · 检查项：42 · 校审依据：检查要求.md · 水利标准.md · 法律法规.md</div>
+    </div>
+    <div class="m-stats">
+      <div class="m-stat"><div class="num" style="color:#6c5ce7">42</div><div class="lbl">检查项总数</div></div>
+      <div class="m-stat"><div class="num" style="color:#10b981">2</div><div class="lbl">符合</div></div>
+      <div class="m-stat"><div class="num" style="color:#ef4444">32</div><div class="lbl">存在问题</div></div>
+      <div class="m-stat"><div class="num" style="color:#3b82f6">4.8%</div><div class="lbl">符合率</div></div>
+      <div class="m-stat"><div class="num" style="color:#9ca3af">8</div><div class="lbl">不适用</div></div>
+    </div>
+    <div class="m-row">
+      <span style="color:#888;align-self:center">筛选：</span>
+      <span class="m-fbtn on">全部</span>
+      <span class="m-fbtn">仅存在问题（部分符合+不符合）</span>
+      <span class="m-fbtn">仅不符合</span>
+    </div>
+  </div>
+
+  <p>报告由以下部分组成：</p>
+  <ul>
+    <li><b>顶部横幅</b>：文档名、文件信息（段落数/表格数/检查项数）、校审依据。</li>
+    <li><b>左侧目录</b>：8 大类导航，滚动时自动高亮当前类别，点击平滑跳转。</li>
+    <li><b>KPI 统计卡</b>：总数 / 符合 / 存在问题 / 符合率 / 不适用。</li>
+    <li><b>问题筛选</b>：全部 / 仅存在问题（部分符合+不符合）/ 仅不符合，一键过滤。</li>
+    <li><b>按类别表格化结论</b>：每条一行，列为「检查项 ｜ 要求 ｜ 检查结果 ｜ 说明 / 建议」。</li>
+    <li><b>行级配色</b>：符合（绿）/ 部分符合（橙）/ 不符合（红）/ 不适用（灰）；有问题行的检查结果与结论加粗、结论红色粗体。</li>
+    <li><b>具体问题清单</b>：对部分符合/不符合项，逐处列出 <code>定位（第N页）</code> → <span style="color:#c62828;font-weight:700">原文照抄</span> → <span style="color:#9aa0a6">[问题类型]</span> → <span style="color:#1b8a3a">逐字修改建议</span>。</li>
+    <li><b>打印支持</b>：@media print 已优化，隐藏侧栏与筛选条，保留配色，可直接打印归档。</li>
+  </ul>
+
+  <h3>Markdown 版（用户指定时）</h3>
+  <p>按类别用二级/三级标题展开，每条含「要求（引用块）」「结论」「依据」，末尾附「校审结果汇总」表（类别 ｜ 条数 ｜ 符合 ｜ 部分符合 ｜ 不符合 ｜ 不适用）。在 GitHub / VSCode / Typora / Obsidian 等渲染器中正确显示。</p>
+
+  <h3>上下标渲染</h3>
+  <p>两种格式均正确渲染上下标：<code>m3/s</code>→m³/s、<code>10的8次方</code>→10⁸、<code>km2/km²</code>→km²、<code>H2O</code>→H₂O、<code>SO4</code>→SO₄。HTML 用 <code>&lt;sup&gt;</code>/<code>&lt;sub&gt;</code> 标签，Markdown 用 GFM 内联 <code>&lt;sup&gt;</code>/<code>&lt;sub&gt;</code> 标签。</p>
+
+  <h3>产物与证据字段速查</h3>
+  <table class="tbl">
+    <thead><tr><th>文件</th><th>内容</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>fulltext.md</code></td><td>全文，每段前缀 P0123 / [H3]</td><td>语义判断与定位引用（subagent 一般不直接读，走切片）</td></tr>
+      <tr><td><code>tables.json</code></td><td>表格二维网格（合并单元格已重建）</td><td>表格检查（切片已含问题表 grid）</td></tr>
+      <tr><td><code>captions.json</code></td><td>图/表题录</td><td>题录/编号检查</td></tr>
+      <tr><td><code>citations.json</code></td><td>标准/法规引用原始数据</td><td>引用检查</td></tr>
+      <tr><td><code>numbers.json</code></td><td>流量/模数/面积/大数/幂次</td><td>数值类检查</td></tr>
+      <tr><td><code>det_table.json</code></td><td>表格核算（pass/fail/warn/info）</td><td>表格逻辑权威依据</td></tr>
+      <tr><td><code>det_citations.json</code></td><td>引用有效性对照（valid/not_in_list/…）</td><td>标准/法规检查依据</td></tr>
+      <tr><td><code>det_numbers.json</code></td><td>流量有效数字/大数单位/等别级别</td><td>文字规范检查依据</td></tr>
+      <tr><td><code>det_numbering.json</code></td><td>图/表编号格式与顺序</td><td>gram_007 依据（det 直出）</td></tr>
+      <tr><td><code>_slices/groupA..D.json</code></td><td>按组裁剪的切片（含本组所需全文/表格/数值/det 证据）</td><td><b>subagent 的唯一输入</b></td></tr>
+      <tr><td><code>det_findings.json</code></td><td>4 条确定性直出结论（std_001/003/004、gram_007）</td><td>合成时覆盖 subagent 同 id 结果</td></tr>
+      <tr><td><code>groupA..D.json</code></td><td>4 组 subagent 的结构化结论</td><td>collect_findings 的输入</td></tr>
+      <tr><td><code>findings.json</code></td><td>合并后的全部 42 条结论（含 det 直出 + subagent）</td><td>合成报告的结论来源</td></tr>
+    </tbody>
+  </table>
+  <div class="note"><b>关于 det_table 的 info：</b>行平均、极值、多合计行/列等只给 <code>info</code>（机器核算供语义复核），<b>不直接判错</b>——是否成问题由 B 组 subagent 结合网格判定，避免 kW/台双单位、经验频率列等场景误报。</div>
+</section>
+
+<!-- 八、环境与依赖 -->
+<section class="section" id="env">
+  <h2><span class="ico">8</span> 运行环境与依赖</h2>
+  <table class="tbl">
+    <thead><tr><th>项目</th><th>要求</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>操作系统</td><td>Windows / macOS / Linux</td><td>脚本为纯 Python，跨平台</td></tr>
+      <tr><td>Python</td><td>Python 3</td><td>已随环境安装</td></tr>
+      <tr><td>必装库</td><td><code>python-docx</code>、<code>lxml</code></td><td>已随环境安装</td></tr>
+      <tr><td>.doc 转换（可选）</td><td>LibreOffice 或 <code>pywin32</code></td><td>旧二进制 .doc 自动尝试转换；失败则改用 com_docx_extract.py 内存直读</td></tr>
+      <tr><td>Word 页码定位（可选）</td><td>Windows + Microsoft Word</td><td>page_map.py 用 Word COM；无 Word 时自动回退为章节标题定位</td></tr>
+    </tbody>
+  </table>
+  <div class="warn"><b>.doc 注意：</b>旧二进制 <code>.doc</code> 格式需依赖 LibreOffice 或 Word 转换。若环境装有<b>数据安全软件（如 Agile DGS）</b>，会拦截 Word 进程的文件写入——SaveAs 出来的文件被加密（python-docx 读不了）。此时改用 <code>com_docx_extract.py</code>：它通过 Word COM 直接遍历文档对象模型，把段落/表格导出为 artifacts，<b>完全绕过写盘</b>。</div>
+</section>
+
+<!-- 九、跨平台运行表现 -->
+<section class="section" id="platform">
+  <h2><span class="ico">9</span> 跨平台运行表现（pi agent / Codex / opencode）</h2>
+  <p class="lead">本技能基于 <b>Claude Code 的 SKILL.md 技能系统</b>构建，依赖其<b>自动加载技能、Agent/Workflow 并行 subagent</b>等机制。换到 <b>pi agent、OpenAI Codex CLI、opencode</b> 等其他 agent 平台时，<b>表现会有差异</b>——但差异集中在「如何被触发、如何并行、由哪个模型下语义判断」，而<b>确定性硬证据部分三家完全一致</b>。</p>
+
+  <h3>9.1 两层结构：哪些会变、哪些不变</h3>
+  <table class="tbl">
+    <thead><tr><th style="width:16%">层</th><th>内容</th><th style="width:32%">是否依赖具体平台</th></tr></thead>
+    <tbody>
+      <tr><td><b>确定性层</b></td><td><code>scripts/*.py</code>（抽取、数值核算、引用对照、编号检查、报告合成）+ <code>references_index.json</code> / <code>requirements.json</code></td><td><span class="badge v-pass">不依赖</span> 纯 Python + python-docx/lxml，三家跑出的 <code>det_*.json</code> 证据<b>完全一致</b></td></tr>
+      <tr><td><b>编排 + 语义层</b></td><td>SKILL.md 自动加载、Agent/Workflow 工具并行 fan-out 4 组 subagent、模型做条文落实/语法/合理性判断</td><td><span class="badge v-fail">强依赖</span> 这是三平台差异最大的部分</td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><b>一句话结论：</b>数值、引用、表格核算、编号等<b>硬证据</b>三家结果一样；<b>语义判断</b>的质量、<b>并行速度</b>、能否<b>被自动触发</b>会有明显差异。</div>
+
+  <h3>9.2 四家平台逐项对比</h3>
+  <table class="tbl">
+    <thead><tr><th style="width:16%">维度</th><th>Claude Code（原版）</th><th>Codex CLI</th><th>opencode</th><th>pi agent</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>SKILL.md 识别</b></td>
+        <td><span class="badge v-pass">原生支持</span> 按 description 关键词自动加载（渐进披露）</td>
+        <td><span class="badge v-fail">不识别</span> 只认 <code>AGENTS.md</code></td>
+        <td><span class="badge v-fail">不识别</span> 用自己的 agent/config 体系</td>
+        <td><span class="badge v-partial">视实现而定</span></td>
+      </tr>
+      <tr>
+        <td><b>并行 subagent</b></td>
+        <td><span class="badge v-pass">原生</span> Agent 工具一条消息并发 / Workflow 工具 pipeline</td>
+        <td><span class="badge v-fail">无等价 fan-out</span> 需手动分段串行</td>
+        <td><span class="badge v-pass">有 subagent</span> 但要自己定义 agent 配置</td>
+        <td><span class="badge v-partial">通常无</span></td>
+      </tr>
+      <tr>
+        <td><b>驱动模型</b></td>
+        <td>Claude（或当前接入模型）</td>
+        <td>GPT 系列</td>
+        <td>任意（接什么是什么）</td>
+        <td>取决于平台</td>
+      </tr>
+      <tr>
+        <td><b>工具 / 权限模型</b></td>
+        <td>Bash/Read/Grep + 权限模式</td>
+        <td>沙箱 + approve 模式，跑 Python 脚本可能要放行</td>
+        <td>自带权限 / 工具系统</td>
+        <td>各异</td>
+      </tr>
+      <tr>
+        <td><b>确定性脚本结果</b></td>
+        <td colspan="4"><span class="badge v-pass">三家一致</span> <code>det_*.json</code> 不经过模型，输出完全相同</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>9.3 实际影响（按优先级）</h3>
+  <div class="cats">
+    <div class="cat" style="border-left-color:var(--fail)">
+      <div class="ch"><h4>① 触发方式要改</h4></div>
+      <p style="font-size:13px;color:#666;margin:6px 0 0">在 Codex / opencode 里，「校审报告」这类词<b>不会自动激活</b>本技能。需把 <code>SKILL.md</code> 内容并进 <code>AGENTS.md</code>，或每次用 <code>@SKILL.md</code> 引用 / 把流程粘进 prompt。</p>
+    </div>
+    <div class="cat" style="border-left-color:var(--partial)">
+      <div class="ch"><h4>② 并行退化为串行（变慢 3–5×）</h4></div>
+      <p style="font-size:13px;color:#666;margin:6px 0 0">效率核心是「一条消息内并发 4 组 subagent」。Codex 基本做不到等价 fan-out，会退化成 A→D 串行（SKILL.md 第 5 节本就写了这条降级路径，<b>结果不变但变慢</b>）；opencode 能配 subagent 但要手搓。</p>
+    </div>
+    <div class="cat" style="border-left-color:var(--brand)">
+      <div class="ch"><h4>③ 语义判断质量随模型波动</h4></div>
+      <p style="font-size:13px;color:#666;margin:6px 0 0">强制性条文落实、排涝模数合理性、语法叠字等判断完全靠模型。换模型后，<code>issues</code> 清单的召回率与「宁缺毋滥、不编造」的把握度会变——这是<b>最不可控</b>的差异。</p>
+    </div>
+    <div class="cat" style="border-left-color:var(--pass)">
+      <div class="ch"><h4>④ 确定性脚本零差异</h4></div>
+      <p style="font-size:13px;color:#666;margin:6px 0 0"><code>deterministic_checks.py</code> 产出的 <code>det_*.json</code> 三家一模一样，因为它们不经过模型——这是跨平台结果可对齐的<b>锚点</b>。</p>
+    </div>
+  </div>
+
+  <h3>9.4 想在 Codex / opencode 上跑，怎么做</h3>
+  <ol>
+    <li><b>把 SKILL.md 转成 AGENTS.md</b>（Codex / opencode 的通用约定），保留流程描述与脚本路径。</li>
+    <li><b>编排逻辑显式化</b>：把「并发 4 组」改成明确的「依次跑这 4 个 prompt」，不依赖 Agent 工具。</li>
+    <li><b>以确定性层作为公共底座</b>：无论哪个平台，先跑 <code>extract_docx.py</code> + <code>deterministic_checks.py</code> + <code>det_findings.py</code> 拿到 <code>det_*.json</code> 与 4 条直出结论，再让模型只做语义层——这样跨平台结果最稳定。</li>
+  </ol>
+  <div class="note"><b>跨平台一致性建议：</b>若需多平台结果可对齐，<b>以 <code>det_*.json</code> 为准绳</b>——它们在任何平台都相同。语义层结论出现分歧时，以确定性证据为准。</div>
+</section>
+
+<!-- 十、目录结构 -->
+<section class="section" id="layout">
+  <h2><span class="ico">10</span> 目录结构</h2>
+<pre><code>design-report-review/
+├── SKILL.md                      技能定义与编排流程（核心）
+├── README.md                     技能简介
+├── 使用说明.html                 本文件（用户使用说明）
+├── references/                   参考/规则（可更新）
+│   ├── 检查要求.md               8 大类 42 条检查项与输出要求（权威）
+│   ├── 水利标准.md               水利标准现行有效清单
+│   └── 法律法规.md               法律法规现行有效清单
+├── scripts/
+│   ├── lib_docx.py               docx 解析基础库（顺序遍历/合并单元格重建/正则/有效数字）
+│   ├── build_reference_index.py  解析两份清单 → references_index.json
+│   ├── extract_docx.py           docx → 结构化 artifacts（主抽取器）
+│   ├── com_docx_extract.py       Word COM 内存直读器（.doc 受 DGS 拦截时用）
+│   ├── deterministic_checks.py   机器可验证证据（表格/引用/有效数字/编号）
+│   ├── slice_artifacts.py        按分组裁剪产物 → _slices/groupA..D.json（提速核心）
+│   ├── det_findings.py           确定性结论直出 std_001/003/004、gram_007（提质提速核心）
+│   ├── collect_findings.py       收集 subagent 产物 + det_findings，合并/校验/全覆盖
+│   ├── polish_findings.py        结论润色（去除机器字段名黑话）
+│   ├── assemble_report.py        合成 HTML / Markdown 报告（det 双保险）
+│   ├── parse_requirements.py     解析检查要求.md → requirements.json
+│   ├── page_map.py               用 Word COM 计算每段 Word 页码（可选）
+│   ├── prepare.py                一键"抽取+确定性检查"（旧版分步）
+│   ├── maintain.py               清单维护：一键重建索引/要求（智能/强制/检查/备份）
+│   ├── references_index.json     (生成) 标准/法规检索索引
+│   └── requirements.json         (生成) 42 条结构化要求
+└── _run/&lt;文档名&gt;/                (生成) 每次运行的 artifacts 与证据
+    ├── fulltext.md tables.json captions.json citations.json numbers.json meta.json locators.json
+    ├── det_table.json det_citations.json det_numbers.json det_numbering.json
+    ├── det_findings.json         (生成) 4 条确定性直出结论
+    ├── _slices/groupA..D.json    (生成) 按分组裁剪的切片（subagent 唯一输入）
+    ├── groupA..D.json            (生成) 4 组 subagent 的结构化结论
+    └── findings.json             (生成) 合并后的全部 42 条结论</code></pre>
+</section>
+
+<!-- 十一、清单动态维护 -->
+<section class="section" id="maintain">
+  <h2><span class="ico">11</span> 清单动态维护</h2>
+  <p class="lead">三份参考清单（<code>检查要求.md</code> / <code>水利标准.md</code> / <code>法律法规.md</code>）是校审的权威源，可由用户<b>随时发起维护</b>——新增、删除、改写条目，或更新标准的现行有效版本。改完 <code>.md</code> 跑一下重建脚本即生效，无需改代码。</p>
+
+  <h3>10.1 重建命令速查（每次维护后必跑）</h3>
+  <table class="tbl">
+    <thead><tr><th>改了哪个 .md</th><th>要跑的重建脚本</th><th>重新生成的 JSON</th></tr></thead>
+    <tbody>
+      <tr><td><code>检查要求.md</code></td><td><code>python scripts/parse_requirements.py</code></td><td><code>requirements.json</code></td></tr>
+      <tr><td><code>水利标准.md</code> 或 <code>法律法规.md</code></td><td><code>python scripts/build_reference_index.py</code></td><td><code>references_index.json</code></td></tr>
+    </tbody>
+  </table>
+  <div class="tip"><b>一键脚本（推荐）：</b>不想记两条命令，用 <code>scripts/maintain.py</code> 一条搞定，且<b>只重建改过的项</b>（按 .md 修改时间判断）；拿不准是否漏跑时用 <code>--check</code> 一查便知；重建后条目数若较旧值腰斩会自动告警（多半是 .md 表格格式被破坏）。
+  <pre><code>python scripts/maintain.py             # 智能重建：只重建改过的
+python scripts/maintain.py --force     # 强制重建全部
+python scripts/maintain.py --check     # 只检查是否漏重建（退出码 0=最新 1=需重建）
+python scripts/maintain.py --backup    # 重建前备份旧 JSON 为 .bak
+python scripts/maintain.py --only req  # 只重建检查要求（或 --only index）</code></pre></div>
+  <div class="warn"><b>务必改 .md、不要直接改 .json：</b>尤其 <code>references_index.json</code> 内含 6 份预计算查找表（<code>standards_by_code</code> / <code>standards_by_name</code> / <code>laws_by_code</code> / <code>laws_by_name</code> / <code>names_by_prefix_code</code> 等），下游 <code>deterministic_checks.py</code> 读的是查找表而非原始列表——只改原始列表<b>不生效</b>。标准/法规一律走 <code>.md</code> + 重建脚本。</div>
+
+  <h3>10.2 标准 / 法规清单维护（水利标准.md、法律法规.md）</h3>
+  <p>三种典型场景，都是改 <code>.md</code> 表格行 → 跑 <code>build_reference_index.py</code>：</p>
+  <table class="tbl">
+    <thead><tr><th style="width:22%">场景</th><th style="width:33%">你怎么做</th><th>重建后，报告再引用该条时的效果</th></tr></thead>
+    <tbody>
+      <tr><td><b>出新版</b><br>（如 SL 252-2017 → SL 252-2024）</td><td>把该行编号、实施日期改成新版</td><td>自动判 <code>year_mismatch</code>，报告提示「清单中该编号现行版本：SL 252-2024《...》(实施...)」</td></tr>
+      <tr><td><b>废止</b></td><td>删掉该行</td><td>判 <code>not_in_list</code>，提示「疑似已废止/编号有误」</td></tr>
+      <tr><td><b>新增</b></td><td>加一行（序号、编号、名称、实施日期）</td><td>之后引用即判 <code>valid</code></td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.3 为什么"维护"有实际收益：版本过期检测</h3>
+  <p><code>deterministic_checks.py</code> 按"前缀+号、忽略年份"（如 <code>SL252</code>）建索引。所以<b>只要清单里始终保持最新版</b>，任何报告引用旧版都会被自动识别并标红，同时告诉你现行版是哪个——清单一更新，后续所有报告的旧版引用立即被检出。这正是"维护有效版本清单"的核心价值，而不只是记台账。</p>
+  <div class="note"><b>标准与法规的匹配差异：</b><b>标准</b>按"编号+年份"匹配，有版本过期检测（<code>year_mismatch</code>）；<b>法规</b>按<b>名称</b>匹配（<code>deterministic_checks.py</code> 引用检查段），无年份过期检测。因此法规清单的维护重点是保证<b>名称</b>与<b>编号</b>准确，而非靠年份自动识别新旧。</div>
+
+  <h3>10.4 检查要求维护（检查要求.md）</h3>
+  <p>增、删、改 42 条中的任意条目（如新增一条检查关注点、调整某条判定口径）→ 跑 <code>parse_requirements.py</code>。下次合成就按新要求逐条校审，报告中的"要求"原文、条目数、KPI 统计会自动跟着变。</p>
+
+  <h3>10.5 可持续维护要点</h3>
+  <ol>
+    <li><b>改 .md，别碰 .json</b>——见 10.1 的警告。<code>requirements.json</code> 虽可手改且立即生效，但与 <code>.md</code> 脱钩，日后重建会被覆盖，不建议作为常规维护方式。</li>
+    <li><b>重建后旧报告不会自动重审</b>。<code>requirements.json</code> / <code>references_index.json</code> 只影响<b>下次</b>校审；已生成的报告要按新规则复评，需重跑"抽取 → 确定性检查 → 语义检查 → 合成"。</li>
+    <li><b>把 <code>references/</code> 纳入版本管理</b>。当前目录非 git 仓库，建议 <code>git init</code> 或定期备份 <code>.md</code>——这样维护历史可追溯（谁、何时、把哪条标准从哪版更新到哪版），误改也能回退。</li>
+    <li><b>清单只存"现行有效版"</b>。表结构无"被替代旧版"字段，惯例是清单只保留当前有效版；旧版不留在清单里，自然被判 <code>not_in_list</code> / <code>year_mismatch</code>。若需记录替代关系作审计，可加一列 <code>备注</code> 手填，脚本不读该列、不影响。</li>
+  </ol>
+</section>
+
+<!-- 十二、FAQ -->
+<section class="section" id="faq">
+  <h2><span class="ico">12</span> 常见问题与边界</h2>
+
+  <h3>Q1 · 默认输出什么格式？怎么改成 Markdown？</h3>
+  <p>默认输出<b>仪表板式 HTML</b>，保存到输入文档同目录：<code>&lt;文档名&gt;_校审报告.html</code>。需要 Markdown 时在对话中明确说"输出 Markdown"，或手动运行 <code>assemble_report.py --format=md</code>。<code>--format=both</code> 可同时输出两种。</p>
+
+  <h3>Q2 · 报告里 "第N页" 的定位是怎么来的？</h3>
+  <p>抽取阶段为每段生成段落序号（P0123）。若运行了 <code>page_map.py</code>（需 Windows + Word），段落号会映射为 Word 页码（P0154→第16页）；未运行则回退为章节标题定位（如「3.6.3.3 §」）。表号定位形如「表3.7.2.2」。</p>
+
+  <h3>Q3 · 某条被判"不适用"是什么意思？</h3>
+  <p>表示该要求不适用于本文档（如内陆项目无潮位资料、未做分期设计洪水等），报告会<b>说明不适用原因</b>。这是正常结论，不代表漏查。</p>
+
+  <h3>Q4 · 强制性条文（mp_*）怎么算"符合"？</h3>
+  <p>以正文是否对该环节做了<b>分析/论证</b>为准，并给出定位。<b>不得仅因提及规范名即判符合</b>——必须看到实质的分析检查内容。</p>
+
+  <h3>Q5 · 引用清单里标 not_in_list 的标准是错的吗？</h3>
+  <p>不一定。引用清单为"现行有效版本"参考，<code>not_in_list</code> 可能是地方/行业外标准或内部技术文件。subagent 会区分"编号错误/已废止"与"非本清单范围但合理"两种情况。</p>
+
+  <h3>Q6 · 表格统计值核算准吗？会不会误报？</h3>
+  <p>对易误报场景（kW/台双单位、经验频率列、序号列、多合计行、区间值）只给 <code>info</code>，<b>不直接判错</b>，由 B 组 subagent 结合网格复核后判定。原则是"宁可漏报也不误报"。</p>
+
+  <h3>Q7 · 大文件会卡吗？</h3>
+  <p>抽取与确定性检查为单进程秒级。语义检查按类别并行，墙钟≈最慢一组；subagent 用 Grep 定位关键词后再分段 Read，不会整文件灌入。</p>
+
+  <h3>Q8 · 怎么换用其他行业/版本的检查规则？</h3>
+  <p>替换 <code>references/</code> 下的清单文件（检查要求.md / 水利标准.md / 法律法规.md），重新运行 <code>build_reference_index.py</code> 与 <code>parse_requirements.py</code> 重建索引即可，流程其余部分不变。</p>
+  <p class="lead">日常的增删改、版本更新等持续维护，见 <a href="#maintain">十一、清单动态维护</a>。</p>
+
+  <div class="tip"><b>效率建议：</b>若环境不支持并发，可按 A→D 顺序逐组串行运行语义检查，结果不变，仅耗时变长。</div>
+</section>
+
+<div class="footer">
+  报告智能校审 · design-report-review · 用户使用说明<br>
+  由确定性脚本（抽取 + 机器证据 + 4 条直出）+ 4 组并行语义检查驱动 · 共 8 大类 42 条检查
+</div>
+
+</div>
+</div>
+
+<script>
+// 目录滚动高亮
+var headers = document.querySelectorAll('.section');
+var links = document.querySelectorAll('#toc-list a');
+function spy(){
+  var cur = '';
+  headers.forEach(function(h){
+    if (h.getBoundingClientRect().top <= 140) cur = h.id;
+  });
+  links.forEach(function(a){
+    a.classList.toggle('active', a.getAttribute('href') === '#' + cur);
+  });
+}
+window.addEventListener('scroll', spy); spy();
+// 平滑滚动
+document.querySelectorAll('#toc-list a').forEach(function(a){
+  a.addEventListener('click', function(e){
+    e.preventDefault();
+    var tgt = document.querySelector(this.getAttribute('href'));
+    if (tgt) tgt.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+});
+</script>
+
+</body>
+</html>

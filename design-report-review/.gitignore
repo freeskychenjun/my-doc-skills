@@ -1,0 +1,15 @@
+# 运行产物与本地数据（不入库）
+_run/
+__pycache__/
+*.pyc
+_pipeline.log
+_req_groups.txt
+_src_backup.docx
+scripts/_legacy/
+
+# 派生索引（maintain.py --force 可再生）
+scripts/references_index.json
+scripts/requirements.json
+
+# 金标准含真实工程报告全文，公开仓库不入库；本地构建方法见 tests/README.md
+tests/golden/
