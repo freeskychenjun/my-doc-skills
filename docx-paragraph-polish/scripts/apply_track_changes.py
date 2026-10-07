@@ -174,6 +174,22 @@ def rewrite_paragraph(p, ops, chars, rev):
     return rev
 
 
+def add_flag_comment(doc, p, text):
+    """在段落 p 上锚定一条 Word 批注（python-docx 只建内容，锚点需手写
+    commentRangeStart/End + commentReference）。返回 True/False。"""
+    cm = doc.comments.add_comment(text, author=AUTHOR, initials='AI')
+    cid = str(cm.comment_id)
+    start = _make(f'{W}commentRangeStart'); start.set(f'{W}id', cid)
+    end = _make(f'{W}commentRangeEnd'); end.set(f'{W}id', cid)
+    ref_r = _make(f'{W}r')
+    ref = _make(f'{W}commentReference'); ref.set(f'{W}id', cid)
+    ref_r.append(ref)
+    ppr = p.find(f'{W}pPr')
+    p.insert(list(p).index(ppr) + 1 if ppr is not None else 0, start)
+    p.append(end); p.append(ref_r)
+    return True
+
+
 def main():
     try:
         sys.stdout.reconfigure(encoding='utf-8', errors='replace')
@@ -238,13 +254,29 @@ def main():
         except Exception as e:
             skipped += 1; skip_reasons.append(f"id{r['id']} 写入失败:{e}")
 
+    # 第二遍：挂疑点批注（必须在段落重建之后，否则锚点会被 rewrite_paragraph 清掉；
+    # 无差异/被跳过的段落同样要挂——疑点与是否改写无关）
+    flagged = 0
+    for r in rewrites:
+        flag = str(r.get('flag') or '').strip()
+        if not flag:
+            continue
+        idx = r['paraIndex']
+        if not (0 <= idx < len(paras)):
+            continue
+        try:
+            add_flag_comment(doc, paras[idx], flag)
+            flagged += 1
+        except Exception:
+            skip_reasons.append(f"id{r['id']} 批注写入失败")
+
     doc.save(str(out_path))
     summary = {'mode': mode, 'threshold': threshold, 'total': len(rewrites),
-               'written': written, 'skipped': skipped, 'skipReasons': skip_reasons,
+               'written': written, 'skipped': skipped, 'flagged': flagged, 'skipReasons': skip_reasons,
                'output': str(out_path)}
     summary_path = out_path.with_name(out_path.stem + '.summary.json')
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding='utf-8')
-    msg = f'共 {len(rewrites)} 段：写入修订 {written} 段，跳过 {skipped} 段。输出: {out_path}'
+    msg = f'共 {len(rewrites)} 段：写入修订 {written} 段，跳过 {skipped} 段，批注 {flagged} 条。输出: {out_path}'
     if skip_reasons:
         from collections import Counter
         grouped = Counter(re.sub(r'id\d+ ', '', s) for s in skip_reasons)
