@@ -14,7 +14,42 @@ description: 校正 Word 文档正文段落——逐段润色/逻辑重构改写
 - Python 3.8+，带 python-docx、lxml（DSH 捆绑 Python 已含）。
 - 无需安装 Microsoft Word 或 WPS。
 
-## 工作流程（四步）
+## 父代理步数预算（硬规则，先读这节）
+
+> 实测依据：一次完整运行（936 段复核稿）墙钟 20.14 分钟，其中**父代理自己那条 145 步的串行循环占 99.8%**（模型往返 71.7% + 本地工具 28.2%）；18 个子代理合计 50.7 agent-min，却全部并行塞在 11.3 分钟的窗口里，而该窗口内父代理的忙碌率是 **99.7%**。
+> 结论：**"把子代理做快"几乎不省墙钟（被并行度吸收），"让父代理少干活"才省墙钟——每砍掉父代理 10% 的输出约等于墙钟省 1.2 分钟。**
+> 另一半：63.5% 的父代理时间花在**自己临时造小工具**上（一次性探针 30.5% + 写提交脚本 14.6% + 合并脚本 8.8% + 校验脚本 9.6%）。所以下面每条都是"禁止重复造轮子"。
+
+**必须遵守：**
+
+1. **一条命令原则**：下文每一步都给定了现成脚本，**直接调用，不要临场重写**。脚本不满足当轮需求时，先在汇报里说明缺什么，再考虑改脚本本身（改动要落进本 skill，不是落进运行目录）。
+2. **禁止写一次性探针脚本**。想查什么，用 `grep`/`read`/单条 `pwsh`；确需脚本的去 `<skill目录>/scripts/diagnostic/` 找现成的（兄弟报告取证、数字互换扫描、污染扫描、法规 grep 等）。**判定标准：这个脚本下一轮还会用吗？不会就别写成文件。**
+3. **一个文件只写一次**。禁止对同一文件反复全文重写——实测有一次把 37k 字符的输出写了 3 遍，该分片墙钟翻 3 倍；父代理侧更严重：`finalize3.py` 被写 3 遍 + 改 15 次，吃掉全部输出 token 的 23.9%。要改就用 `edit` 定点修改。
+4. **禁止裸 `Start-Sleep` 轮询**。DSH 会在子代理结束时**自动通知**父代理（派发后约 1 s 一条 `Agent … sent a message`、`turn/end` 后约 0.01 s 一条 `Background subagent … finished`；后台 job 同理）。**收到通知再继续**；只想确认文件落盘时用"短轮询 + 就绪即退"（模板见下），**不要**用 `list_agents` 巡检，更不要 `Start-Sleep 90`（实测白等 41.75 s）。
+   ```bash
+   # 文件就绪短轮询（最多等 15 分钟，就绪即退）
+   python -c "import os,time
+   fs=[f'pass1_part{i}.json' for i in range(1,7)]
+   t=time.time()
+   while time.time()-t<900:
+       if all(os.path.exists(f) and os.path.getsize(f)>2 for f in fs): break
+       time.sleep(2)
+   print('ready',[(f,os.path.exists(f)) for f in fs])"
+   ```
+5. **两遍改写可并行派发**：pass1 与 pass2 互不依赖（任务书明禁 pass2 读 pass1 产物），不必等 pass1 全完成；但**并发按限流表取值**，且仲裁必须在合并之后。
+6. **收尾自检**：汇报时给出本轮父代理大致步数与端到端时长；步数明显超出下表预算时，说明哪一步膨胀了。
+
+| 阶段 | 正常预算步数 | 现成命令 |
+|---|---:|---|
+| 备料（第 2–3 步） | 3–5 | `prep.py`（一条命令跑提取/lint/引用/图表/分片）、`scan_protect.py` |
+| 派发与改写（第 4 步） | 2–4 | `make_prompts.py pass` + 派发 + 每遍一次 `check_parts.py` |
+| 合并与仲裁（第 5 步） | 3–6 | `merge_passes.py`、`build_arb.py`、`make_prompts.py arb`、`check_arb.py` |
+| 查证（第 6 步） | 2–4 | `collect_flags.py` + `make_prompts.py verify` + 派发 + `apply_verdicts.py` |
+| 写回与终检（第 7 步） | 3–5 | `finalize.py`、`apply_track_changes.py`、`postapply_check.py` |
+| 收尾汇报 | 1–2 | — |
+| **合计** | **约 15–26 步** | 对照：没做固化前的实测运行是 **145 步** |
+
+## 工作流程（七步）
 
 ### 第 1 步：确认模式
 
@@ -27,7 +62,15 @@ description: 校正 Word 文档正文段落——逐段润色/逻辑重构改写
 
 若文件可能被单位透明加密（打不开/乱码/提示损坏），提示用户先走 `decrypt-office-pdf` skill 解密。
 
-### 第 2 步：提取正文段落
+### 第 2 步：备料（一条命令）
+
+```bash
+python <skill目录>/scripts/prep.py "<docx路径>" --workdir "<运行目录>" --parts 6
+```
+
+一条命令跑完：提取正文段落 → lint → `check_refs` → `check_figures_tables` → 按累计字数均分成分片 → 打印**中文待办清单**（总段数/总字数/分片数/各片段数字数/lint 命中数/引用问题数/图注问题数/建议并发档位）并写 `prep-report.json`。幂等，重复跑不会重造分片（要重造加 `--force`）。
+
+各环节也可单独调用（排障用）：
 
 ```bash
 python <skill目录>/scripts/extract_body_paragraphs.py "<docx路径>" ["<输出json路径>"]
@@ -48,6 +91,27 @@ python <skill目录>/scripts/lint_paragraphs.py "<paragraphs.json>" ["<输出lin
 
 规则表在脚本头部（TYPO_MAP / REGEX_RULES），按项目积累直接往里加条目。
 
+同一步里再跑三个**确定性核查**（与 lint 并列，作为改写与收尾的输入）：
+
+```bash
+python <skill目录>/scripts/check_refs.py "<paragraphs.json>"
+python <skill目录>/scripts/check_figures_tables.py "<docx路径>"
+python <skill目录>/scripts/scan_protect.py "<docx路径>" "<paragraphs.json>"
+```
+
+- `scan_protect.py`（**每轮必跑**）扫出重建段落时会有风险的段并生成**保护清单** `protected_ids.json` + `format_scan.json`：含 OMML 公式的段、含 run 级上下标格式的段、编制依据/引用清单行、公式行、技术附录里含文件名/路径/配置键的行；同时记录"格式上标 → 普通数字"的 revert 规则供双上标防护使用。第 7 步的 `finalize.py --fmt-scan` 直接复用它，不要重复扫。
+
+- `check_refs.py` 扫出《名称》（编号/令号）与两份本机对照表（法律法规 / 水利标准）的矛盾、旧版本年份；结果**附进第 4 步改写 prompt**（模型据此改正编号/令号，不要自行臆断）。第 6 步查证遍再以它的输出为准绳复核一遍。
+- `check_figures_tables.py`（读原 docx，不依赖 paragraphs.json）扫图表编号与引用：重复编号、跳号、编号内空格、层级混用、表/图缺题注（表题可能在正文段或表格首行，都能识别，支持"续表"）、悬空引用、未被引用图表。结果**不进改写 prompt**（题注段不在改写范围，改了也会被跳过），在收尾汇报中完整列出并附修复建议；正文引用侧的矛盾可供第 6 步查证遍交叉核对。注意它只做确定性判定，**表体内容与表题张冠李戴、图内容与图名是否相符属语义判断**，不在其列。
+  - **大坑：w:noBreakHyphen**。题注编号里的连字符常是不换行连字符元素（非 w:t 文本），漏映射会把"图 5.1-1"读成"图 5.11"，制造大批"丢连字符"假阳性（para_text 已映射，改脚本时勿回退）。
+- 题注编号可**自动修复**时（可选执行）：
+
+```bash
+python <skill目录>/scripts/fix_captions.py "<docx>" <figcheck.json> [-o out.docx]
+```
+
+  以修订标记写回副本（默认 `<原名>-题注修订.docx`），每处挂说明批注。只修可确定性判定的：**A级** 正文引用与题注编号去分隔符后精确配对（错在题注侧）；**B级** 丢连字符反推（尾段末位前插'-'），且要求与现有题注序列衔接自洽（按前缀组合并现有序号判连续）。**不自动修**：重复编号（哪条该改属语义判断，如赣江多水库小节各自重编 4.2-x）、含 Word 域的题注（文本修改会被域刷新覆盖，需改域代码或转固定文本）、序列不自洽的孤立反推（列入 fix-report 的 suggest）。修复常呈现为"插入一个连字符"的最小修订。
+
 ### 第 4 步：改写（默认 2 遍 + 仲裁；由你完成，不调外部 API）
 
 同一段提示词对同一模型跑两遍结果会有明显漂移（实测单遍仅捕获约 35% 可发现问题，两遍并集约 85%），因此**默认跑 2 遍独立改写**：
@@ -61,7 +125,7 @@ python <skill目录>/scripts/lint_paragraphs.py "<paragraphs.json>" ["<输出lin
 - 保持原意不变；**已有的数字、参数一律原样保留，不得修改或替换**。
 - **不规范的单位写法可以且应该改正**：如 `Km/KM→km`、`M→m`、全半角混用等，按 SI/文档主流写法统一；改正时保持数值不变。
 - 地名、工程名、圩堤名等**专名原则上保留**；专名中明显的 OCR/错别字可以修（如"太子湖人"→"太子湖入"），但**不得替换专名本身**（如把"太子湖"改成"太子河"属违规——对象变了，需人工核实）。所有触及专名的改动在该段的 `flag` 字段写一句说明（脚本会自动转成 Word 批注）。
-- **疑似事实错误不要改**：如某处数字与全文其他处矛盾（"16个涝区"vs 全文"19个"）、名称与上下文不符（"赣中区"疑为"赣东北区"）、单位疑似笔误（"1.64m"疑为 km）——newText 填原文，并在该段 `flag` 字段写明疑点（脚本自动转成 Word 批注，用户在文档里看到提醒，无需在对话中另行列表）。
+- **疑似事实错误不要改**：如某处数字与全文其他处矛盾（"16个涝区"vs 全文"19个"）、名称与上下文不符（"赣中区"疑为"赣东北区"）、单位疑似笔误（"1.64m"疑为 km）、法规/标准编号或名称疑似有误——newText 填原文，并在该段 `flag` 字段写明疑点（脚本自动转成 Word 批注，用户在文档里看到提醒，无需在对话中另行列表）。**改写阶段只挂 flag 不裁决；裁决统一放到第 6 步查证遍**（多数 flag 经查证后可直接改掉，不必留给用户）。
 - 输出必须仍是**单个自然段的纯文本**：不得含换行符、列表符号、Markdown 标记；不得增删段落数。
 - 不得新增原文没有的事实性内容（新数据、原因、依据、结论、专业判断）。
 - 原文已足够规范时**原样输出该段**（脚本判无差异自动跳过，无需强行改）。
@@ -70,20 +134,43 @@ python <skill目录>/scripts/lint_paragraphs.py "<paragraphs.json>" ["<输出lin
 
 **逻辑重构模式**要点：若段落确有逻辑问题（句序不当、因果缺失、句式杂糅），可重排句序、拆分/合并句子，用连接词（“因此”“由于”“进而”“尽管”等）显化**原文已隐含**的逻辑关系；逻辑已通顺则只做字词润色。绝不可凭空补出原文未给出的理由或结论。
 
-输出文件 `rewrites.json`（与 paragraphs.json 同 id 对应，`paraIndex`/`original` 必须从 paragraphs.json **原样复制**，不得手打）：
+输出文件 `rewrites_partN.json`（**瘦身契约**：只写改动段与 flag 段，实测比"每段抄一遍原文"少 85% 输出 token）：
 
 ```json
-[
-  { "id": 1, "paraIndex": 3, "original": "……", "newText": "……" },
-  { "id": 2, "paraIndex": 5, "original": "……", "newText": "……", "flag": "疑似事实错误：16个涝区与全文19个不一致，请核实。" }
-]
+{
+  "_meta": { "part": 3, "examined": 156, "changed": 9, "lastId": 471 },
+  "changes": [
+    { "id": 12, "newText": "……" },
+    { "id": 40, "flag": "疑似事实错误：16个涝区与全文19个不一致，请核实。" }
+  ]
+}
 ```
 
-`flag` 为可选字段：**疑似事实错误**（newText 填原文不改动）或**专名改动说明**（改了专名内错字时留痕）。脚本会在对应段落挂 Word 批注（作者"AI校正"），用户在 Word/WPS 审阅时直接看到提醒。
+契约细则（**违反任何一条都会被 `check_parts.py` 判失败并重跑该片**）：
 
-写完后自检：每条 newText 中不得出现换行；抽查数字、参数与 original 逐字一致（数值绝不可变）；单位改动仅限"不规范→规范"且数值不变；所有触及专名的改动单独汇总备报。rewrites.json 需包含全部段落（无需改动的段 newText 填原文即可，脚本自动判定无差异）。
+- `changes` **只含**两类条目：有改动的段 `{id, newText}`、只有疑点的段 `{id, flag}`；**不改动的段一律不要出现**（不是填原文，是不写这条）。
+- **不写 `original`、不写 `paraIndex`**——脚本会按 `id` 从 paragraphs.json 自动回填原文，并据此做相似度/串段/数字守卫。
+- `_meta` 是必填的完整性自报：`examined` = 本分片段数（错了即判失败）、`changed` = 与原文确有差异的段数、`lastId` = 本分片最后一段的 id（漏读片尾会填错，比 examined 更硬）。
+- `newText` 等同原文时**不要写这个字段**（要挂 flag 就只写 flag）。
+- `flag` 用于：**疑似事实错误**（不写 `newText`，留给第 6 步查证）或**专名改动说明**（改了专名内错字时留痕）。脚本会自动转成 Word 批注（作者"AI校正"）。
 
-**长文档并行改写（默认策略）**：段落 ≳60 段或总字数 ≳1.5 万时，把 paragraphs.json 按**累计字数均分**成 4–6 个分片文件（paragraphs_partN.json），每片派一个 subagent 并行改写（subagent 的 prompt 必须完整复制上面的红线约束和输出格式，指明读哪个分片、写哪个 rewrites_partN.json、UTF-8 无 BOM）。
+写完后自检：`newText` 不得含换行；数字、参数与原文逐字一致（数值绝不可变）；单位改动仅限"不规范→规范"且数值不变；`²/³` 计数不得多于原文；不得把另一段的内容写进本段（串段是本契约最容易犯的错——**逐条对着 id 写**）；所有触及专名的改动单独汇总备报。
+
+**长文档并行改写（默认策略）**：段落 ≳60 段或总字数 ≳1.5 万时，用第 2 步 `prep.py --parts N` 生成的 4–6 个分片（`paragraphs_partN.json`，按累计字数均分），每片派一个 subagent 并行改写。任务书**一条命令生成，不要现写**：
+
+```bash
+python <skill目录>/scripts/make_prompts.py pass --workdir "<运行目录>" \
+    --report "<报告名>" --round 第一轮 --parts 6
+#   → prompts/PROMPT_pass1_partN.md 与 PROMPT_pass2_partN.md（占位符全填、零残留已校验）
+#   → prompts/prompts-manifest.json（分派清单）
+#   本报告有专项留意项时加 --watch-file watch.md（如"某引用名称与编号矛盾，勿自行改名"）
+```
+
+模板里已含全部红线、瘦身契约与两条纪律（禁止同一文件多遍全文写入、路径照抄任务书）。
+
+**两遍改写可并行派发**（互不依赖），但每遍结束都要先过 `check_parts.py` 再做下一步。短文档（≲60 段）不派发，父代理自己写。
+
+**分片均衡提示**：实测六片耗时离散度（pass1 最慢/最快 2.83×）来自**产出量**离散而非排队（`Pearson(单片墙钟, 单片输出 token)=0.967`），所以按字数均分已足够；真正会毁掉均衡的是"某个子代理把同一个文件写了多遍"——这正是上面那条纪律要防的。
 
 **并发与限流（重要）**：并行分片会瞬时推高请求速率，服务端限流（如 429 / `1302 您的账户已达到速率限制`）会让某个子代理**无消息失败**——表现为分片文件缺失或半截。**限流阈值随 provider 差别很大，不要用统一并发数**：
 
@@ -122,24 +209,156 @@ python <skill目录>/scripts/merge_passes.py "<paragraphs.json>" -o "<merged.jso
 3. **仲裁遍**（轻量，只处理冲突+低置信段，约为全程 1/10 成本）：你阅读 merge-report 中的候选改文，逐段裁定——真错误选最优候选（或最小 diff 版本，改动最小者最可能是纯纠错）、可改可不改的弃改、疑似事实问题写 flag——写成 `arb.json`（`[{"id":..,"newText":..,"flag"?}]`）重新跑 merge 带 `--arb`；
 4. 所有段落最后叠加 `auto_fix` 零风险修复（lint 的确定性部分）。
 
-仲裁时注意：候选里**方向改反的**要否决（实测出现过某遍把"为"改回"是"）；diff 最小的候选通常最安全。仲裁遍同样受限流约束（实测 196 项分 6 片一次发即触发过限流），建议**分 2–3 批发**，每批回来再用 check_parts 校验。
-
-### 第 6 步：以修订模式写回
+**仲裁输入用脚本生成，不要手写**（历史上 13 个运行目录各自重写过 build_arb）：
 
 ```bash
-python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<merged.json路径>" [polish|logic] ["<输出docx路径>"]
+python <skill目录>/scripts/build_arb.py "<merged.merge-report.json>" --paragraphs "<paragraphs.json>" --parts 3
+#   → arb_input_part1..N.json（按 id 排序切片，每包附原文、各候选、前后段摘要）
+#   → 该目录下没有仲裁子代理写出的 arb_part*.json 时，父代理自己裁定也可直接读这些包
+
+python <skill目录>/scripts/check_arb.py "<merged.merge-report.json>" "arb_part{}.json" --count 3
+#   逐条断言 newText 逐字等于该段的某个 candidates、**或等于原文**（实测 195 条仲裁里有 124 条是合法的"保持原文"，
+#   所以默认口径是"候选 ∪ 原文"；要强制必须来自候选就加 --require-candidate）、id 属于该包、无跨包重复
+
+python <skill目录>/scripts/build_arb.py "<merged.merge-report.json>" --combine
+#   → arb.json（合并 + 基本校验）
+
+# 仲裁任务书同样一条命令生成（包数与分片数无关，默认 3 包）
+python <skill目录>/scripts/make_prompts.py arb --workdir "<运行目录>" --report "<报告名>" --arb-parts 3
+#   → prompts/PROMPT_arb_partN.md（每包内已附条目、各候选与前后段上下文）
 ```
 
-脚本行为：
+仲裁时注意：候选里**方向改反的**要否决（实测出现过某遍把"为"改回"是"）；diff 最小的候选通常最安全。**`newText` 必须从 candidates 逐字复制**（历史上仲裁代理多次自作主张改写，`check_arb.py` 就是拦这个的）。仲裁遍同样受限流约束（实测 196 项分 6 片一次发即触发过限流），建议**分 2–3 批发**。
 
-1. 复制原文档为输出文件（默认 `<原名>-修订.docx`，**原文档不动**）；
-2. 逐段做**字符级 LCS diff**：删字写 `w:del`（delText）、增字写 `w:ins`，未改动部分原样保留（含原格式）；修订作者标记为 `AI校正`；
-3. 净改动占比超门槛（润色 0.6 / 逻辑重构 0.95，硬顶 0.95）、改写含多段、段落内容与提取时不一致的段落**自动跳过**并在摘要中列明原因；
-4. 打印统计并输出 `*.summary.json`；`flag` 字段自动转成段落上的 Word 批注（含无差异/跳过的段落——疑点与是否改写无关）。
+### 第 6 步：查证遍（裁决 flag，减少用户判断工作）
+
+合并/仲裁完成后、写回之前，**汇总全部 flag**（改写遍的 + 仲裁遍新增的，含无差异段的 flag），逐条查证并按证据处置。目标是：能证实的直接改掉（用户在 Word 里仍可拒绝），改不了的才留批注。
+
+```bash
+python <skill目录>/scripts/collect_flags.py "<merged.json>" --paragraphs "<paragraphs.json>"
+#   → flags.json：id / 原文 / flag 文案 / 粗分类（法规·标准·数字·地名·其他）+ 批次建议 + 控制台计数
+```
+
+汇总用脚本做（不要自己写一个），它会给出当前 flag 总数与建议批数；数量 ≳30 时按建议分批派 subagent。
+
+**查证任务书也一条命令生成**（按证据源自动分批：法规+标准 / 数字 / 地名+其他）：
+
+```bash
+python <skill目录>/scripts/make_prompts.py verify --workdir "<运行目录>" \
+    --report "<报告名>" --batch-size 10
+#   → prompts/PROMPT_verify_batchN.md（每批内嵌该批 flag 的原文与当前候选文本）
+```
+
+模板 `templates/PROMPT_verify_batch.md` 里已含证据源路由表与 9 条红线（证实即改 / 无来源不得改 / 数字只升级批注 / `VERIFY_CITATION` 只核实引用本身 / 全篇体例问题交父代理收口），**不要现写**。
+
+**裁决落库也是一条命令**（同时把"改了数字的段"登记成豁免，避免收口时被数字 guard 静默回退）：
+
+```bash
+python <skill目录>/scripts/apply_verdicts.py --workdir "<运行目录>"
+#   → merged.verified.json（裁决已落库）+ finalize_config.json（num_exempt 自动登记）
+#   → apply-verdicts.json（报告：逐类计数、自动豁免、漏裁清单、未复核的数字变化）
+
+python <skill目录>/scripts/apply_verdicts.py --workdir "<运行目录>" --exempt "413,414"
+#   脚本会报出 unverified_numeric_changes（非裁决 fix、但数字多重集变了、收口时必被回退的段，
+#   如"删去重复年份"）。**逐条看过、确认合法后**用 --exempt 放行；不确定就不要放行（让它被回退）。
+```
+
+裁决语义（脚本自动执行）：`fix` → `newText` 换成裁决文本、`flag` 写"已核实并改正：依据…"（若裁决文本与当前文本相同，说明改写遍已改好 → **丢弃 flag**，不留噪音）；`keep` → **删掉该段 flag**（弃改）；`upgrade_flag` → `newText` 不动、`flag` 换新文案。覆盖率与漏裁会一并报出，`--strict` 可让漏裁直接失败。
+
+**注意 `finalize.py` 之后要加 `--respect-merged`**：`finalize.py` 会清掉一批经查证属误报的批注，不带这个开关时 `collect_flags.py` 会把已清掉的 flag 从 pass/arb 里捡回来（实测 71 条 vs 成品 58 条）。查证遍在 finalize 之后重跑时务必带上。
+
+**不设 flag 数量上限**：所有 flag 一条不落地查证，不得因数量多而抽样、跳过或"代表性抽检"。数量大（≳30 条）时按类型分批派 subagent 并行查证（每批 10–15 条，读同一批 flag + 必要证据源，回写裁决结果），父代理汇总；查证结论仍由父代理复核来源后才落进 merged.json。
+
+**先跑确定性核查（A/B 两类的主要来源）**：
+
+```bash
+python <skill目录>/scripts/check_refs.py "<paragraphs.json>" [-o refcheck.json] [--all]
+```
+
+脚本把段落里的《名称》（编号/令号）与两份本机对照表比对，输出每条的 `status` / `action` / `expected`（默认抑制 `NOT_FOUND`，`--all` 显示）：
+
+| status | 含义 | 处置 |
+|--------|------|------|
+| `NAME_CODE_MISMATCH` + `action=FIX_CODE` | 名称与编号张冠李戴，且**名称本身是表中标准名** | 按名称改正编号（`expected` 给出正确编号） |
+| `NAME_CODE_MISMATCH` + `action=VERIFY_CITATION` | 名称与编号不符，且**该名称不在对照表任何编号下**（疑非标准名/误记） | **不得机械按编号改名称**，须按本段主题核实该引用本身 |
+| `LAW_DOCNUM_MISMATCH` | 法规令号/年份与名称不符 | 按 `expected` 改正令号与年份 |
+| `OLD_VERSION` / `STD_NOT_CURRENT` | 引用了旧版本年份（表内已有现行版本） | 改为表内现行版本编号 |
+| `NOT_FOUND` | 对照表未收录 | 不算问题，不作裁决（可留作提示） |
+
+实证过的真实案例（务必按此判据行事）：某报告写《河道水面线计算规范》（SL/T 4—2020）——SL/T 4—2020 实为《农田排水工程技术规范》，而《河道水面线计算规范》在对照表与公开标准中都**不存在**（河道水面线推算惯引 SL 104《水利工程水利计算规范》）。此时正确处置是**核实并修正该引用本身**（或按主题换成真正的依据），而不是把名称改成《农田排水工程技术规范》。
+
+**脚本是独立召回通道**：`check_refs.py` 报出的问题，即使改写遍/仲裁遍**从未写过对应 flag**，也必须在查证遍一并处置（模型漏报引用错误是常态）；反之，脚本未报的引用问题照旧走下面的路由表查证。
+
+**总则：证实即直接改。** 只要证据足以认定原文有误，就按正确写法改（以修订写入，用户仍可在 Word 里拒绝）；不要停在"已证实但保守留批注"。只有**证据不足**或改动对象是**数字/数值本身**时，才留批注并把查证结论写进批注文案。
+
+**按 flag 类型路由证据源与处置：**
+
+| 类型 | 证据源（按优先级） | 证实后的处置 |
+|------|------------------|-------------|
+| **A. 法律法规引用**（法律/条例/办法/规范的发文编号、主席令/国务院令号、名称、施行时间） | 先看 `check_refs.py` 输出；脚本未覆盖的再查本机权威对照表 `D:\Claude Code\报告智能检查skill\references\法律法规.md`（读该文件按名称/编号检索） | **直接以修订改正**（newText 改为表中正确写法），flag 改写为「已核实并改正：依据法律法规对照表，XX 应为 XX（施行 XX）」 |
+| **B. 水利技术标准引用**（SL / SL/T / GB / GB/T 的编号、年份号、名称） | 先看 `check_refs.py` 输出；脚本未覆盖的再查本机权威对照表 `D:\Claude Code\报告智能检查skill\references\水利标准.md`；注意年份号意味着版本替代（如 SL/T 551—2024 替代旧年份），应改用表中现行有效版本 | 同上直接改；但 `action=VERIFY_CITATION` 的**只核实引用本身**，不得按编号改名称 |
+| C. 文内一致性（数字/名称与全文其他处矛盾） | 父代理全文检索统计（paragraphs.json 里 grep 同类表述），无需外部资料 | 多数派明确（如全文 5 处"19个"vs 1 处"16个"）→ **直接改**；各执一词或仅单处 → 保留批注 |
+| D. 其他外部事实（地名归属、工程名、水位/规模数值、术语规范写法） | 依次：`md-knowledge-search`（历年报告库，同项目/同工程的其他表述是最强证据）→ `chenjun-md-remote-search` / `river-basics` / `hydro-data-query` / `design-query` → `web_search` 兜底 | **≥2 个独立来源一致**才动手；表述/名称类 → 直接改；**数字类即使查到也只升级批注文案**（附来源），不替用户拍板改数 |
+
+**红线：**
+
+- 查证结论必须把**依据来源写进 flag 文案**（对照表条目、库中文档名、或 URL），无来源不得改；
+- A/B 类在两份对照表中**查不到该法规/标准时不得臆改**——可能是表中未收录的现行标准，保留原批注并注明「不在对照表内，未裁决」；
+- `action=VERIFY_CITATION` 时：能按本段主题查到真正的依据（附来源）就改该引用，查不到就保留批注并写明「名称与编号矛盾：编号 X 实为《…》，而《…》非标准名，请核实」；**绝不把名称改成表内那个不符的名称**；
+- 查证遍失败或超时**不阻塞主流程**：未裁决的 flag 原样保留为批注（即退化为无查证遍的旧行为）；
+- 裁决结果直接改 merged.json（改 newText 的同时改写 flag 文案），改完再进入第 7 步写回；改动仍受 apply_track_changes 的门槛保护。
+
+### 第 7 步：写回 + 确定性终检（三条命令）
+
+```bash
+# ① 收口：保护清单 + 双上标防护 + 两道数字 guard + 相似度 guard + 批注定稿
+python <skill目录>/scripts/finalize.py "<paragraphs.json>" --merged "<merged.json>" \
+    -o "<final.json>" --fmt-scan "<format_scan.json>" --config "<finalize_config.json>" \
+    --protect-out "<protected_ids.json>"
+#   项目特有内容只走配置（finalize_config.json：typo / term / reffix / num_exempt / flag_final /
+#   clear_flags），通用逻辑不许改脚本。先 --dry 看会回退哪些段（也可用 check_guard.py 单看诊断）。
+
+# ② 写回（带保护清单与数字 guard）
+python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<final.json>" [polish|logic] \
+    [--protect "<protected_ids.json>"] --numeric-guard --num-exempt "<id,id>" ["<输出docx路径>"]
+
+# ③ 终检（accept/reject 双视图 + 修订/批注计数 + run 级附加元素前后一致）
+python <skill目录>/scripts/postapply_check.py "<输出docx>" "<final.json>" --src "<原docx>"
+#   ⚠ 一定传 final.json（写回时实际用的那份），不要传 merged.json：
+#     finalize 会回退若干段（实测 merged 86 段 → final 84 段），传错会误判失败。
+#   ⚠ 它会自动读同目录的 <产出docx主干>.summary.json，把「保护清单/含特殊内容而有意跳过」的
+#     段从期望中排除——**不给这份 summary 就会把有意跳过误判成"期望有但未写"**（实测 30 段误报）。
+#     summary 不在同目录时用 --summary 指定。
+```
+
+`apply_track_changes.py` 行为（核心 diff 逻辑未变）：复制原文档为输出（默认 `<原名>-修订.docx`，**原文档不动**）；逐段字符级 LCS diff，删字写 `w:del`、增字写 `w:ins`、未改动部分原样保留（含原格式），修订作者 `AI校正`；净改动占比超门槛（润色 0.6 / 逻辑重构 0.95）、改写含多段、与提取时不一致的段落自动跳过并列出原因；`flag` 自动转成 Word 批注（含无差异/跳过段）。
+
+`--protect` 跳过的段落**不算错误**（OMML/上下标格式段等重建必丢元素）；**段内附加元素默认就保留**（`w:tab`/`w:drawing`/`w:fldChar`/书签/`m:oMath`），只有要复现旧行为才加 `--no-keep-extras`。`postapply_check.py` 任一项不符即非零退出——**不要跳过这一步**。
+
+**两条"用错就静默出错"的调用约束（务必照抄上面的命令）：**
+
+- `apply_track_changes.py` 的 `--numeric-guard` **默认是关闭的**，必须显式加；不加等于数字改动不会被拦。
+- `finalize.py` 必须显式给 `--merged`。缺省时它会自己去目录里找 `merged.json`/`final.json`，**在第二轮及以后的运行目录里可能读到上一轮的 `final.json`，用错输入且不报错**。
+- 先在 `--dry` 下确认「回退清单」符合预期再真跑；`check_guard.py` 只是同一套 guard 的只读诊断视图，两者结论应同源。
 
 ### 收尾汇报
 
-向用户报告：总段数、两遍投票采纳/冲突仲裁/低置信分布、写入修订 N 段、跳过 M 段（跳过原因分组）、lint 自动修复 X 段、批注 K 条；输出文件路径；提醒用户在 Word/WPS 中打开后用「审阅→修订→接受/拒绝」逐条审阅，疑点批注处理完后手动删除。对跳过的段落给出原文与你的改写建议，让用户自行决定是否手动替换。
+向用户报告：总段数、两遍投票采纳/冲突仲裁/低置信分布、写入修订 N 段、跳过 M 段（跳过原因分组）、lint 自动修复 X 段、引用核查（check_refs）报出并改正几条（按 status/action 分类）、**图表核查（check_figures_tables）问题清单**（重复/丢连字符/缺题注/悬空引用等，按类别列出并给修复建议——题注修复超出本 skill 改写范围，列出供用户手动处理或另行安排）、查证遍处置（法规/标准/文内一致/外部事实各类：已证实直接改几条、升级批注几条、未查到保留几条）、批注 K 条；输出文件路径；提醒用户在 Word/WPS 中打开后用「审阅→修订→接受/拒绝」逐条审阅，疑点批注处理完后手动删除。对跳过的段落给出原文与你的改写建议，让用户自行决定是否手动替换。
+
+**另需报告（提速自检，见开头"父代理步数预算"）**：本轮父代理大致步数 + 端到端时长 + 是否落在预算内（超了要说哪一步膨胀）；`finalize.py` 的保护跳过段数与数字/相似度回退清单；`postapply_check.py` 的终检结论（双视图一致、修订/批注计数、run 级附加元素前后计数）。这三项都是"确定性证据"，不要只写"已完成"。
+
+## 诊断工具箱（按需，不进默认流程）
+
+以下手段**每轮不一定用得上，但用到时不要重写**（放 `<skill目录>/scripts/diagnostic/`；某轮的一次性探针用完就删，不要留在运行目录里）：
+
+| 用途 | 手段 |
+|---|---|
+| 判定「这是第几轮 / 相对上轮变了哪些段」 | `scripts/round_diff.py`（五通道锚定对齐，解决 id 漂移；输出 `changed_ids`/`global_watch`/`suggested_shards`；**`--min-overlap 0.95` 不达标直接拒绝**，退出码 3）。注意：**不要**用"只改变化段"来裁剪改写范围——实测第二轮起 97.6% 的修订落在"上轮没变"的段上，裁了会丢修订；它只用来做轮次判定与 id 漂移诊断。 |
+| 同系列兄弟报告的同模板句取证 | 这是本项目**最强取证源**（用于证伪全局误替换、核对年份/数量）；在 `md-knowledge-search` 里按同项目/同工程检索，或直接 grep 兄弟分册的 paragraphs.json |
+| 数字互换 / 段内自相矛盾扫描 | grep 数字并人工比对前后文；段内自相矛盾可直接判定，不必等外部证据 |
+| 污染/串段扫描 | `check_parts.py` 已内建（相似度 <0.5 且与他人原文 ≥0.9 → 硬失败）；批量体检时用 `--verbose` 看相似度分布 |
+| 法规/标准原文核对 | `check_refs.py` 输出 + 两份本机对照表（见第 6 步路由表） |
+| 透明加密/文件损坏 | `decrypt-office-pdf` skill；G 盘原件首拷易截断，先 Word COM 另存到本地盘再处理 |
 
 ## 已知边界
 
@@ -149,5 +368,10 @@ python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<merged.json
 ## 排障
 
 - 打开/保存失败或内容乱码：多为透明加密文件，转 `decrypt-office-pdf` 解密后重试。
-- 「段落内容已变化」：rewrites.json 的 paraIndex/original 与文档不符，重新提取再生成。
+- `check_parts.py` 报「`_meta.examined` 与分片段数不符」/「缺 `lastId`」：该分片没读完或被截断，**整片重跑**（不要只补几段）。
+- `check_parts.py` 报「疑似串段」：某条 `newText` 像另一段的原文——瘦身契约最容易犯的错，整片重跑并核对 id→内容配对。
+- `check_parts.py` 报「上标计数增加」：把 `km2` 改成了 `km²` 但原文没用上标 → 单位体例属全篇决策，回退该段。
+- 「段落内容已变化」：运行目录里残留了上一轮的 `paragraphs.json`/分片，重新跑 `prep.py --force`。
 - diff 矩阵超限（原文超长段落）：脚本自动跳过该段，属预期保护。
+- `postapply_check.py` 报附加元素计数不一致：写回时漏了 `--keep-extras`，或该段本应在保护清单里（补 `--protect` 后重跑）。
+- **旧的全量契约产物（带 `original`、id 全集）过新 `check_parts.py` 报硬失败，不一定是兼容性问题**：格式兼容是保留的（不带 `_meta` 就按全量契约校验），但新增的三条机械护栏（串段/上标/`_meta`）对全量产物同样生效。实测拿历史旧产物回归时，护栏抓出过真实的串段与上标污染——那是旧产物本来就有问题，用投票掩盖了。要区分"格式不兼容"与"被护栏抓出真问题"：看失败措辞是「缺 original/缺 N 条」还是「疑似串段/引入上标」。

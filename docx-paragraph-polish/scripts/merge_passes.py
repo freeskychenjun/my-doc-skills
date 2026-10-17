@@ -9,9 +9,13 @@
 
 输入:
 - paragraphs.json      extract 输出（id/paraIndex/text）
-- --passes             N 遍改写的 rewrites json（≥2 遍）
+- --passes             N 遍改写的 rewrites json（≥2 遍）；每条可为
+                       {id,newText[,flag]}（瘦身契约）或 {id,paraIndex,original,newText[,flag]}
+                       （旧全量契约），两种可混用；**缺 newText 的条目按"本遍未改动"处理**
+                       （瘦身契约里纯 flag 段就是这样表达的）。
 - --lint               lint_paragraphs.py 输出（可选；auto_fix 不依赖它，只用于统计）
 - --arb                仲裁结果 [{id,newText,flag?}]，解决 conflicts/lowconf
+                       （若某条只有 flag 没有 newText，视为"弃改、只留批注"）
 - --adopt-lowconf      无仲裁时直接采纳单票改动（默认不采纳，保持原文）
 
 合并策略:
@@ -67,6 +71,19 @@ def dedupe_flags(flags):
     return out
 
 
+def load_pass(path):
+    """读一遍改写产物，兼容两种契约：
+    - 旧全量契约：JSON 数组 [{id,paraIndex,original,newText[,flag]}, ...]
+    - 瘦身契约  ：JSON 对象 {"_meta":{...},"changes":[{id,newText|flag}, ...]}
+    返回数组（条目可能缺 newText —— 那是纯 flag 段 / 本遍未改动）。"""
+    d = json.load(open(path, encoding='utf-8-sig'))
+    if isinstance(d, dict):
+        d = d.get('changes') or []
+    if not isinstance(d, list):
+        raise ValueError(f'{path}: 既不是数组也不是 {{"_meta","changes"}} 对象')
+    return d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('paragraphs')
@@ -80,8 +97,8 @@ def main():
     args = ap.parse_args()
 
     paras = json.load(open(args.paragraphs, encoding='utf-8'))
-    passes = [json.load(open(f, encoding='utf-8-sig')) for f in args.passes]
-    arb = {r['id']: r for r in json.load(open(args.arb, encoding='utf-8-sig'))} if args.arb else {}
+    passes = [load_pass(f) for f in args.passes]
+    arb = {r['id']: r for r in load_pass(args.arb)} if args.arb else {}
 
     stats = Counter()
     report = {'adopted_2plus': [], 'conflict': [], 'lowconf': [], 'arb_resolved': [],
@@ -94,7 +111,9 @@ def main():
         for pw in passes:
             r = next((x for x in pw if x['id'] == i), None)
             if r:
-                texts.append(r['newText'])
+                # 瘦身契约：纯 flag 段没有 newText ⇒ 本遍对该段未改动，不计票
+                if 'newText' in r:
+                    texts.append(r['newText'])
                 if r.get('flag'):
                     flags.append(r['flag'])
         a = arb.get(i)
@@ -107,10 +126,15 @@ def main():
         votes = Counter(changed)
         top_text, top_n = (votes.most_common(1)[0] if votes else (None, 0))
 
-        if i in arb:
+        if i in arb and 'newText' in arb[i]:
             chosen, why = arb[i]['newText'], 'arb'
             stats['仲裁采纳'] += 1
             report['arb_resolved'].append(i)
+        elif i in arb:
+            # 仲裁只给 flag、不给 newText ⇒ 明确"弃改，只留批注"
+            chosen, why = orig, 'arb-flag-only'
+            stats['仲裁弃改（只留批注）'] += 1
+            report.setdefault('arb_flag_only', []).append(i)
         elif top_n >= 2:
             chosen, why = top_text, 'vote'
             stats['≥2票一致'] += 1
