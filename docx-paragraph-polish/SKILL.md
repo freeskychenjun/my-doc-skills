@@ -316,7 +316,18 @@ python <skill目录>/scripts/finalize.py "<paragraphs.json>" --merged "<merged.j
     -o "<final.json>" --fmt-scan "<format_scan.json>" --config "<finalize_config.json>" \
     --protect-out "<protected_ids.json>"
 #   项目特有内容只走配置（finalize_config.json：typo / term / reffix / num_exempt / flag_final /
-#   clear_flags），通用逻辑不许改脚本。先 --dry 看会回退哪些段（也可用 check_guard.py 单看诊断）。
+#   clear_flags / paren_mode），通用逻辑不许改脚本。先 --dry 看会回退哪些段（也可用 check_guard.py 单看诊断）。
+#
+#   ⚠ **括号体例开关 `--paren-mode`（默认 full）——派发前必须先统计一次再定**：
+#     finalize 的 normalizer 会把**所有非保护段（含模型根本没改的段）**中「CJK 相邻的半角括号」
+#     按**成对**方式转成全角。默认 full 适用于「全角为主」的报告（多数项目即如此）；
+#     但若某报告**以半角括号为既有主风格**（实测修河：半角 597 处 vs 全角 76 处），full 会凭空
+#     产生 300+ 段「仅体例统一」的纯标点修订，把真正的文字润色淹没在噪声里，且与 lint 的
+#     风险分级自相矛盾（lint_paragraphs 把「半角括号」列为**仅报告、不自动修复**）。
+#     判定动作：`grep`/python 统计全文半角与全角括号数量 → 半角为主就把 finalize_config.json
+#     的 "paren_mode" 设成 "keep"（或命令行加 --paren-mode keep），并在汇报里作为"全篇体例决策"写明。
+#     **注意派发侧要同步**：若最终选 keep，改写任务书（--watch-file）必须提前禁止模型改括号，
+#     否则两遍改写会各自翻转、投票冲突暴涨。
 
 # ② 写回（带保护清单与数字 guard）
 python <skill目录>/scripts/apply_track_changes.py "<docx路径>" "<final.json>" [polish|logic] \

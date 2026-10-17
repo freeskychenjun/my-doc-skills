@@ -111,7 +111,8 @@ def numbag(text):
 
 def load_config(path):
     cfg = {'typo': {}, 'term': {}, 'reffix': {}, 'reffix_note': {},
-           'num_exempt': [], 'flag_final': {}, 'clear_flags': [], 'name': ''}
+           'num_exempt': [], 'flag_final': {}, 'clear_flags': [], 'name': '',
+           'paren_mode': 'full'}
     if not path:
         return cfg
     raw = json.loads(Path(path).read_text(encoding='utf-8-sig'))
@@ -130,6 +131,11 @@ def load_config(path):
 
 def make_normalizer(cfg):
     typo, term = cfg['typo'], cfg['term']
+    # paren_mode：'full'（默认）=中文语境半角括号统一成全角；'keep'=保留原文括号体例。
+    # 依据：lint_paragraphs.py 把「半角括号」列为**仅报告、不自动修复**的规则，
+    # 说明它本属需判断的体例项；当某报告以半角括号为既有主风格（如半角远多于全角）时，
+    # 统一成全角会制造数百段纯标点修订、淹没真正的文字润色，故提供 keep 档由父代理全篇决策。
+    paren_mode = str(cfg.get('paren_mode') or 'full').strip().lower()
 
     def normalize(text):
         t = auto_fix(text)[0]
@@ -140,7 +146,8 @@ def make_normalizer(cfg):
         t = WD.sub(r'〔\1〕\2号', t)
         t = norm_tilde(t)
         t = norm_quotes(t)
-        t = norm_parens(t)
+        if paren_mode != 'keep':
+            t = norm_parens(t)
         return t
     return normalize
 
@@ -205,6 +212,8 @@ def main():
     ap.add_argument('--config', default='')
     ap.add_argument('--protect-out', default='')
     ap.add_argument('--extra-pattern', default='')
+    ap.add_argument('--paren-mode', default='', choices=['', 'full', 'keep'],
+                    help='括号体例：full=半角统一成全角（默认）；keep=保留原文半角（半角为主的报告）')
     ap.add_argument('--dry', action='store_true')
     args = ap.parse_args()
 
@@ -215,6 +224,8 @@ def main():
     base = pj.parent
     paras = {p['id']: p for p in json.loads(pj.read_text(encoding='utf-8-sig'))}
     cfg = load_config(args.config)
+    if args.paren_mode:
+        cfg['paren_mode'] = args.paren_mode
     normalize = make_normalizer(cfg)
     REFFIX, REF_NOTE = cfg['reffix'], cfg['reffix_note']
     NUM_EXEMPT, FLAG_FINAL, CLEAR_FLAGS = cfg['num_exempt'], cfg['flag_final'], cfg['clear_flags']
@@ -329,6 +340,9 @@ def main():
 
     out.sort(key=lambda x: x['paraIndex'])
     print('格式扫描来源: %s' % fmt_src)
+    print('括号体例: %s' % ('保留半角（keep）' if
+                            str(cfg.get('paren_mode') or 'full').lower() == 'keep'
+                            else '半角统一为全角（full，默认）'))
     print('保护段 %d：' % len(protected))
     for k, v in Counter(protected.values()).most_common():
         print('   %s: %d' % (k, v))
