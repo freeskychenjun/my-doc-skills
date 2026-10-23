@@ -31,8 +31,8 @@ git clone https://github.com/freeskychenjun/my-doc-skills.git
 ## 致谢
 
 - [copylee711/dsh-office](https://github.com/copylee711/dsh-office)（MIT）：`wps-word-cooperate` 的**做法**取自它——用 COM 让 Office/WPS 自己动手改文档、用页面图元（EMF）而不是截图来核对版式；`wps-word-cooperate/reference/wps-quirks.md` 里那份 WPS 与 Word 的差异清单，有相当一部分是通过观察它的行为记录归纳的。**代码没有拷贝它的**：helper 是按本项目的需求从零写的（C# 5、7 个 partial class 文件），实现路径也做了不同的取舍（例如它用常驻进程 + JSON 管道，本 skill 用"一命令一进程 + UTF-8 文件往返"，换来零安装与易分发）。
-- [LibreOffice](https://www.libreoffice.org/) 与 Python 生态（`python-docx`、`PyMuPDF`、`Pillow`）在测试与文档生成环节提供了工具链支持；`design-report-format` / `design-report-review` 两个 skill 的部分排版与渲染思路来自这些工具的行为对照。
-- 第 `docx-paragraph-polish` 的规则库与校审条目，来自本院历年报告的校审实践，不依赖任何第三方库。
+- `docx-paragraph-polish` 的规则库与校审条目，来自本院历年报告的校审实践，不依赖任何第三方库；`wps-word-cooperate` 的验收语料是本仓库生成的合成报告（非真实项目文档）。
+- 测试与文档生成用了 Python 生态（`python-docx`、`Pillow`、`PyMuPDF`）与系统自带的 .NET `csc.exe`；它们只用于开发/验证，不是运行依赖。
 
 ## 许可证
 
