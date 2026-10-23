@@ -27,3 +27,13 @@ git clone https://github.com/freeskychenjun/my-doc-skills.git
 - `design-report-review`、`design-report-format` 以 git subtree 迁入（保留完整历史），今后在本仓库统一维护。
 - `wps-word-cooperate` 需要 **Windows + WPS Office**（走 COM 自动化），其余三个是纯文件处理、跨平台。
 - 每个 skill 自带 `README.md`（给人看）、`SKILL.md`（给 AI 看）；`wps-word-cooperate` 另附单文件 `guide.html` 使用说明。
+
+## 致谢
+
+- [copylee711/dsh-office](https://github.com/copylee711/dsh-office)（MIT）：`wps-word-cooperate` 的**做法**取自它——用 COM 让 Office/WPS 自己动手改文档、用页面图元（EMF）而不是截图来核对版式；`wps-word-cooperate/reference/wps-quirks.md` 里那份 WPS 与 Word 的差异清单，有相当一部分是通过观察它的行为记录归纳的。**代码没有拷贝它的**：helper 是按本项目的需求从零写的（C# 5、7 个 partial class 文件），实现路径也做了不同的取舍（例如它用常驻进程 + JSON 管道，本 skill 用"一命令一进程 + UTF-8 文件往返"，换来零安装与易分发）。
+- [LibreOffice](https://www.libreoffice.org/) 与 Python 生态（`python-docx`、`PyMuPDF`、`Pillow`）在测试与文档生成环节提供了工具链支持；`design-report-format` / `design-report-review` 两个 skill 的部分排版与渲染思路来自这些工具的行为对照。
+- 第 `docx-paragraph-polish` 的规则库与校审条目，来自本院历年报告的校审实践，不依赖任何第三方库。
+
+## 许可证
+
+本仓库采用 **MIT License**，见 [LICENSE](LICENSE)。各 skill 目录内若另有 `LICENSE`（如 `design-report-review/`），以目录内那份为准。

@@ -132,3 +132,11 @@ reference/               WPS 差异清单、加密与交付
 - 加一条命令：在对应 `.cs` 里写 `private static object XxxDoc(Bag a)`，在 `WpsHelper.cs` 的 `Dispatch` 里加一行 `case "xxx":`，在 `wps.ps1` 的 `ValidateSet` 和 `switch` 里各加一段。
 - 改完直接跑 `wps.ps1 status`：源码哈希变了会自动重编（约 1 秒）。
 - 验收：`tests/` 里有语料和校验器，`validate.py` 用 COM 独立核对修订数、接受后的文本、批注、PNG 非空白。
+
+---
+
+## 致谢与许可
+
+- 做法参考 [copylee711/dsh-office](https://github.com/copylee711/dsh-office)（MIT）：用 COM 让 WPS 自己改文档、用页面图元（EMF）而不是截图核对版式。**代码没有拷贝它的**——helper 按本项目需求从零写（C# 5、7 个 partial class），实现取舍也不同：它走"常驻进程 + JSON 管道"，本 skill 走"一命令一进程 + UTF-8 文件往返"，换来零安装、单文件夹分发。
+- `reference/wps-quirks.md` 的差异清单，一部分是通过观察上述项目在 WPS 上的行为归纳的，一部分是本项目实测（含 2026-10 在白塔河等真实报告上的验证）。
+- 本项目采用 MIT License（见仓库根目录 `LICENSE`）。
