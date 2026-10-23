@@ -1,0 +1,15 @@
+# 编译产物（首次运行由 csc.exe 生成，不入库）
+*.exe
+*.pdb
+build/
+
+# 本地运行产物
+work/
+.tmp/
+sandbox-*/
+__pycache__/
+*.pyc
+
+# 快照与交接单（本地状态，不入库）
+*.handoff.md
+snapshots/
