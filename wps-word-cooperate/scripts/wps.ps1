@@ -9,7 +9,7 @@
 param(
     [Parameter(Mandatory = $true, Position = 0)]
     [ValidateSet('doctor', 'status', 'open', 'read', 'revise', 'comment', 'render', 'font',
-                 'format', 'style', 'page', 'table', 'caption', 'picture', 'toc', 'reference', 'view', 'fields', 'cell', 'insert', 'revisions', 'snapshot', 'diff', 'handoff',
+                 'format', 'style', 'page', 'table', 'caption', 'picture', 'toc', 'reference', 'view', 'fields', 'cell', 'insert', 'revisions', 'snapshot', 'diff', 'handoff', 'audit',
                  'save', 'close', 'quit')]
     [string]$Command,
 
@@ -54,6 +54,7 @@ param(
     [string]$Since,
     [string]$Note,
     [switch]$Delete,
+    [int]$Max = 200,
     [string]$Paper,
     [string]$Orientation,
     [string]$Top,
@@ -190,7 +191,13 @@ switch ($Command) {
     }
     'comment' {
         if (-not $Doc) { Write-Error-Json 'BAD_ARGS' 'comment needs -Doc' }
-        if ($Delete) {
+        if ($Items) {
+            if (-not (Test-Path -LiteralPath $Items)) { Write-Error-Json 'BAD_ARGS' ('Items file not found: ' + $Items) }
+            $raw = [System.IO.File]::ReadAllText((Resolve-FullPath $Items), [System.Text.Encoding]::UTF8)
+            $parsed = $raw | ConvertFrom-Json
+            if ($parsed.PSObject.Properties.Name -contains 'items') { $request['items'] = @($parsed.items) } else { $request['items'] = @($parsed) }
+        }
+        elseif ($Delete) {
             $request['delete'] = $true
             if ($All) { $request['all'] = $true }
             elseif ($Index -gt 0) { $request['index'] = $Index }
@@ -385,6 +392,11 @@ switch ($Command) {
         if (-not $Doc) { Write-Error-Json 'BAD_ARGS' 'handoff needs -Doc' }
         if ($Note) { $request['note'] = $Note }
         if ($As) { $request['out'] = Resolve-FullPath $As }
+    }
+    'audit' {
+        if (-not $Doc) { Write-Error-Json 'BAD_ARGS' 'audit needs -Doc' }
+        if ($Max -gt 0) { $request['max'] = $Max }
+        if ($Action) { $request['rules'] = $Action }
     }
     'save' {
         if (-not $Doc) { Write-Error-Json 'BAD_ARGS' 'save needs -Doc' }

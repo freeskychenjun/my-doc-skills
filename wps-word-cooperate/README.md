@@ -11,6 +11,21 @@
 
 ---
 
+
+## 一条通道（重要）
+
+一旦这份文档在本 skill 手上（WPS 里开着），**这次协作里就别把它交给别的文档 skill**：
+
+| 要做的事 | 用本 skill 的 | 不要用 |
+|---|---|---|
+| 校审 | `audit` + `comment -Items`（批注直接落在原文） | design-report-review（它会另起一套离线流程） |
+| 润色 / 改写 | `revise`（修订模式） | docx-paragraph-polish（它改磁盘、出副本） |
+| 排版 | `format` / `style` / `page` | design-report-format（它只支持微软 Word） |
+
+原因不是"体验"，是**会坏**：那几个 skill 改的是磁盘文件，而这份文档正被 WPS 独占——实测写盘会 `PermissionError`；它们还产出副本，一改就变成两份内容不同的稿子。
+
+唯一例外：用户明确要"不动原件、出一份新稿"或"无人值守批量跑"。那时先 `save` → `close` 交出去，回来再 `open` 产出的文件、`snapshot` 重建基线。
+
 ## 能干什么
 
 | 场景 | 你能说 | 它会 |

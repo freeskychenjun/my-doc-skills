@@ -273,6 +273,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $s save   -Doc "D:\\报告\\
 <tr><td><code>picture</code></td><td>插图（可带图题）/ 调宽高 / 按百分比裁剪；缩太小会告警</td></tr>
 <tr><td><code>toc</code></td><td>插入并刷新目录域（依赖标题样式）</td></tr>
 <tr><td><code>reference</code></td><td>参考文献列表（悬挂缩进）/ 段末上标引用 <code>[1,2,5]</code></td></tr>
+<tr><td><code>audit</code></td><td><b>机械检查</b>：单位未用上标、重复词、括号混用、连续空格、全角数字、标题跳级、图表缺题注——返回段落号与建议，供判断后落批注</td></tr>
 <tr><td><code>fields</code></td><td><b>一键刷新全部域</b>：页码、目录、题注、引用（改完正文、交付前跑一次）</td></tr>
 <tr><td><code>view</code></td><td>把窗口滚到某段/某页（不动光标）</td></tr>
 </tbody>
@@ -343,6 +344,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File $s save   -Doc "D:\\报告\\
   <b>一个必须记住的语义：</b>WPS 里的文本是<b>"接受视图"</b>——插入的字临时算进去、删掉的字临时不算。所以<br>
   · <b>「还有多少待裁决」看 <code>revisions</code></b><br>
   · <b>「文本最后长什么样」看 <code>diff</code></b>
+</div>
+
+<div class="card" style="border-left:3px solid var(--accent)">
+  <h3>一条通道（先守这条，再谈别的）</h3>
+  <p>一旦这份文档在本 skill 手上（WPS 里开着），<b>这次协作里就不要把它交给别的文档 skill</b>：校审用 <code>audit</code> + <code>comment -Items</code>，润色用 <code>revise</code>，排版用 <code>format</code> / <code>style</code> / <code>page</code>。</p>
+  <p class="copy">原因不是体验，是<b>会坏</b>：那几个 skill 改的是磁盘文件，而这份文件正被 WPS 独占（实测写盘 PermissionError）；它们还产出副本，一改就分成两份内容不同的稿子。</p>
+  <p class="copy">例外：用户要「不动原件、出一份新稿」或「无人值守批量跑」——那就先 <code>save</code>、<code>close</code>，把文件交出去。</p>
 </div>
 
 <h2 id="scenario">两套协作剧本</h2>

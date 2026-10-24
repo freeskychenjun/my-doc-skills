@@ -13,7 +13,15 @@ description: 在 WPS Writer 里实时改 Word 文档——打开用户正开着�
 > 输出只有一段 JSON：`{"ok":true,"result":{...}}` 或 `{"ok":false,"error":{"code":"...","message":"..."}}`。
 > 环境：Windows + WPS；首次调用会用系统自带 `csc.exe` 编译 helper（约 1 秒，之后按源码哈希缓存，不再编译）。
 
-## 铁律（五条，一条都不能省）
+## 铁律（六条，一条都不能省）
+
+0. **一份文档，一条通道（最重要）。** 一旦本 skill 打开了某份文档、或接管了用户正开着的那份，**在这次协作期间，这份文档的一切处理都走本 skill**：
+   - 校审 → `audit` + `comment -Items`（**不要**加载 `design-report-review`）
+   - 润色 / 改写 → `revise`（**不要**加载 `docx-paragraph-polish`）
+   - 排版 → `format` / `style` / `page`（**不要**加载 `design-report-format`）
+
+   理由不是"体验"，是**会坏**：那几个 skill 改的是磁盘文件，而这份文档正被 WPS 独占（实测写盘 `PermissionError`）；它们还产出副本，会让你眼前这份和副本分成两条线。
+   唯一例外：用户明确要"**不动原件、出一份新稿**"或"**无人值守批量跑**"——那时先 `save` → `close` 交出去，回来再 `open` 产出的文件、`snapshot` 重建基线。
 
 1. **先 `status`，再动手，并说出在哪儿动手。** 每次开工第一条命令是 `status`，把"几个实例在跑 / 开着哪些文档 / 哪份是 active / 有没有未保存修改"念给用户，并明确报出**即将修改的那份文档的完整路径**。不碰用户没指定的文件。
 2. **`readOnly` 就是不许改。** `open`/`read` 返回 `readOnly: true`（文件被别处占用或有只读属性）时，`revise`/`comment` 会直接报 `READONLY`。**不要**用另存、改文件属性、杀占用进程等方式绕过去——先问用户。
@@ -30,7 +38,7 @@ description: 在 WPS Writer 里实时改 Word 文档——打开用户正开着�
 | `open` | `-Doc <路径> [-Show] [-ReadOnly]` | 已开则复用，未开则打开；返回 readOnly、段落数、页数 |
 | `read` | `-Doc <路径> [-From 1] [-Count 60] [-Tables]` | 段落（编号/样式/自动编号/文本/inTable）+ 表格清单 + 页数/修订数/批注数；表格清单默认就返回 |
 | `revise` | `-Doc <路径> -Items <json文件>` | **修订模式**批量改写（见下），返回改动与修订计数 |
-| `comment` | `-Doc <路径> -Para N [-Anchor "文字"] (-TextFile <txt文件> \| -Text "短文本")`；删除：`-Delete -Index N \| -All` | 加批注（中文正文走文件，避开引号转义） |
+| `comment` | 单条：`-Para N [-Anchor "文字"] (-TextFile <txt文件> \| -Text "短文本")`；**批量：`-Items <json>`**；删除：`-Delete -Index N \| -All` | 加批注（中文正文走文件，避开引号转义） |
 | `render` | `-Doc <路径> -Page 1 [-To 4] -Out <目录> [-Width 1100]` | 页面 EMF → PNG（宽 320–2400），返回每页路径与尺寸 |
 | `font` | `-Doc <路径> -Name <字体名> [-Track]` | 把**正文、页眉、页脚、文本框**里的字体统一改成指定字体（中英文一起改，`-Name 仿宋`）；返回每个区段的结果与回读值。默认**不产生修订**，整批算一个撤销单元 |
 | `format` | `-Doc <路径> [-Para N \| -From N -To M \| -Style 样式名]` + 任意格式项 | 对**整篇/一段/一段区间/某样式的所有段**套字符与段落格式（见下） |
@@ -42,6 +50,7 @@ description: 在 WPS Writer 里实时改 Word 文档——打开用户正开着�
 | `toc` | `-Doc <路径> [-Para N] [-Title 目录] [-Levels 3]` | 插入并刷新目录（域），可从文首或指定段之前 |
 | `reference` | 列表：`-Action list -Items <json 数组> [-AtPara N] [-Heading 参考文献]`；引用：`-Action cite -Para N -Numbers "1,2,5"\|"3-6"` | 生成参考文献列表 / 在段末插入上标引用 |
 | `view` | `-Doc <路径> -Para N` 或 `-Page N` | 把 WPS 窗口滚到那一段/那一页（唯一能做的"跟随"，不动文档内容） |
+| `audit` | `-Doc <路径> [-Max N] [-Action 规则名,逗号分隔]` | **机械检查**（离线上不去的那半）：单位未用上标、重复词、括号混用、连续空格、全角数字、段末空格、标题层级跳级、图表缺题注、连续空段；返回段落号 + 建议，供你判断后落批注 |
 | `fields` | `-Doc <路径>` | **刷新全部域**：页码、目录、题注编号、引用（改完正文、交付前跑一次） |
 | `cell` | `-Doc <路径> (-Table n -Row r -Col c \| -Para N) -Text "..."` + 任意格式项 | 改一个表格单元格的文字（可带字体字号对齐） |
 | `insert` | `-Doc <路径> [-Para N] [-Where after\|before\|end] -Items <json> [-Track]` | **批量插入段落**（默认干净写入、不进修订；`-Track` 才走修订），可带样式与格式 |
@@ -190,6 +199,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File <skill>\scripts\wps.ps1 font
 - 目录是域，插完要刷新；`toc` 已内置 `Update()`。改完正文后再跑一次 `toc` 即可更新页码。
 - `view` 只滚窗口、不改文档，是"跟随修改位置"能做到的最大程度（不是插件那种跟随滚动）。
 - 拉到最后要提醒：**目录、页码、域在 WPS 里刷新过再交给用户**——用 `fields` 一条命令刷新全部域，比逐项找更省事。
+
+### k) 在这份文档上做校审（不换 skill）
+
+```powershell
+# ① 机械检查：一次性拿到"哪里可能有问题"的候选清单（带段落号）
+<skill>\scripts\wps.ps1 audit -Doc "D:\报告\某报告.docx" -Max 200
+# ② 读被点名的段落，自己判断哪些是真问题（机械检查只管形，不管义）
+<skill>\scripts\wps.ps1 read  -Doc "D:\报告\某报告.docx" -From 86 -Count 1
+# ③ 把结论一次性落成批注（每条锚到具体字句）
+<skill>\scripts\wps.ps1 comment -Doc "D:\报告\某报告.docx" -Items "D:\报告\批注.json"
+# ④ 复核气泡落点，交付
+<skill>\scripts\wps.ps1 render -Doc "D:\报告\某报告.docx" -Page 3 -To 4 -Out "D:\报告\_pages"
+```
+
+- `audit` 只报**能机械判定**的（单位写法、重复词、括号、空格、标题跳级、图表缺题注）。语义类问题（强制性条文、数据一致性、结论与图表不符）靠你 `read` 之后判断——**别指望 audit 替你做判断**。
+- `批注.json`：`{"items":[{"para":86,"anchor":"m3/s","text":"单位建议改上标：m³/s。"}]}`；先校验全部锚点，有一条对不上就**一条都不加**。
+- 校审完**不要**另起一套离线校审流程；用户要的是"这份文档上看到批注"，不是一份 HTML 报告。若用户明确只要旁挂报告、不要动原文，那时才另说。
 
 ### j) 和人接力（`snapshot` / `diff` / `revisions` / `handoff`）
 

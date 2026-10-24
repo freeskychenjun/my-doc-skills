@@ -1,6 +1,6 @@
 ---
 name: docx-paragraph-polish
-description: 校正 Word 文档正文段落——逐段润色/逻辑重构改写，以 Word 修订（track changes）模式写回，删字标删除、增字标插入，用户可在 Word 或 WPS 里逐条接受/拒绝。当用户要求：校正段落/校正全文/完善文字表达/润色报告/规范表达/文字校对/正文润色/逐段改写/修订模式改写 docx 时使用。默认面向中文正式报告（水利/工程报告语气为默认风格），通用中文报告同样适用。触发词：校正段落、校正全文、润色、完善表达、规范化表达、逐段校正、修订润色、polish paragraphs、track changes 改写。不适用：纯排版格式化（用 design-report-format）、内容校审找错（用 design-report-review）、从零撰写新文档。
+description: 校正 Word 文档正文段落——逐段润色/逻辑重构改写，以 Word 修订（track changes）模式写回，删字标删除、增字标插入，用户可在 Word 或 WPS 里逐条接受/拒绝。当用户要求：校正段落/校正全文/完善文字表达/润色报告/规范表达/文字校对/正文润色/逐段改写/修订模式改写 docx 时使用。默认面向中文正式报告（水利/工程报告语气为默认风格），通用中文报告同样适用。触发词：校正段落、校正全文、润色、完善表达、规范化表达、逐段校正、修订润色、polish paragraphs、track changes 改写。不适用：纯排版格式化（用 design-report-format）、内容校审找错（用 design-report-review）、从零撰写新文档。**若这份文档正在 WPS/Word 里由 AI 实时协作修改（用户开着窗口在看），改用 `wps-word-cooperate`**，不要在这里重写文件——文件被 WPS 独占时写盘会失败，产出副本又会与用户眼前那份分叉。
 ---
 
 # docx-paragraph-polish：校正段落文字（Word 修订模式）

@@ -384,10 +384,11 @@ internal static partial class Program
             case "snapshot": return SnapshotDoc(a);
             case "diff": return DiffDoc(a);
             case "handoff": return HandoffDoc(a);
+            case "audit": return AuditDoc(a);
             case "save": return SaveDoc(a);
             case "close": return CloseDoc(a);
             case "quit": return QuitAll(a);
-            default: throw new Fail("BAD_ARGS", "unknown cmd \"" + cmd + "\"; use doctor|status|open|read|revise|comment|render|font|format|style|page|table|caption|picture|toc|reference|view|fields|cell|insert|revisions|snapshot|diff|handoff|save|close");
+            default: throw new Fail("BAD_ARGS", "unknown cmd \"" + cmd + "\"; use doctor|status|open|read|revise|comment|render|font|format|style|page|table|caption|picture|toc|reference|view|fields|cell|insert|revisions|snapshot|diff|handoff|audit|save|close");
         }
     }
 
@@ -1122,6 +1123,73 @@ internal static partial class Program
             dr["comments"] = TryGet(() => (object)(int)doc.Comments.Count, 0);
             dr["saved"] = false;
             return dr;
+        }
+        // Batch mode: several comments in one call (what an in-place review needs).
+        if (a.Has("items"))
+        {
+            List<object> list = a.List("items");
+            if (list.Count == 0) throw new Fail("BAD_ARGS", "\"items\" is empty");
+            int paraCount = (int)TryGet(() => (object)(int)doc.Paragraphs.Count, 0);
+            List<Dictionary<string, object>> plan = new List<Dictionary<string, object>>();
+            foreach (object raw in list)
+            {
+                Dictionary<string, object> item = raw as Dictionary<string, object>;
+                if (item == null) throw new Fail("BAD_ARGS", "each item must be {\"para\":N,\"text\":\"...\"}");
+                Bag ib = new Bag(item);
+                int pIdx = ib.Int("para", 0);
+                if (pIdx < 1 || pIdx > paraCount) throw new Fail("ANCHOR_MISSING", "paragraph " + pIdx + " does not exist (the document has " + paraCount + ").");
+                string tx = ib.Str("text", null);
+                if (tx == null || tx.Trim().Length == 0) throw new Fail("BAD_ARGS", "item for paragraph " + pIdx + " has no \"text\"");
+                string an = ib.Str("anchor", null);
+                if (an != null && an.Length > 0)
+                {
+                    string pt = CleanPara(Convert.ToString(TryGet(() => (object)doc.Paragraphs.Item(pIdx).Range.Text, ""), CultureInfo.InvariantCulture));
+                    if (IndexOf(pt, an, 0) < 0)
+                        throw new Fail("ANCHOR_MISSING", "paragraph " + pIdx + " does not contain \"" + an + "\"; nothing was commented.");
+                }
+                plan.Add(item);
+            }
+            dynamic app0 = App(true, true);
+            dynamic undo0 = null;
+            try { undo0 = app0.UndoRecord; undo0.StartCustomRecord("wps-word-cooperate comments"); } catch (Exception) { undo0 = null; }
+            List<object> made = new List<object>();
+            try
+            {
+                foreach (Dictionary<string, object> item in plan)
+                {
+                    Bag ib = new Bag(item);
+                    int pIdx = ib.Int("para", 0);
+                    string tx = ib.Str("text", "");
+                    string an = ib.Str("anchor", null);
+                    dynamic rng = doc.Paragraphs.Item(pIdx).Range;
+                    if (an != null && an.Length > 0)
+                    {
+                        string pt = CleanPara(Convert.ToString(rng.Text, CultureInfo.InvariantCulture));
+                        int idx = IndexOf(pt, an, 0);
+                        int start = (int)rng.Start + idx;
+                        rng = doc.Range(start, start + an.Length);
+                    }
+                    doc.Comments.Add(rng, tx);
+                    Dictionary<string, object> one = new Dictionary<string, object>();
+                    one["para"] = pIdx;
+                    one["anchor"] = an == null ? "" : an;
+                    one["text"] = tx;
+                    made.Add(one);
+                }
+            }
+            catch (Exception e)
+            {
+                throw new Fail("COM_ERROR", "comments stopped part way: " + Clean(e.Message));
+            }
+            finally { if (undo0 != null) { try { undo0.EndCustomRecord(); } catch (Exception) { } } }
+            Dictionary<string, object> br = new Dictionary<string, object>();
+            br["name"] = Convert.ToString(TryGet(() => (object)doc.Name, ""), CultureInfo.InvariantCulture);
+            br["added"] = made.Count;
+            br["items"] = made;
+            br["comments"] = TryGet(() => (object)(int)doc.Comments.Count, 0);
+            br["saved"] = false;
+            br["note"] = "All comments were checked first: if one anchor is missing nothing is added.";
+            return br;
         }
         int para = a.Int("para", 0);
         if (para < 1) throw new Fail("BAD_ARGS", "\"para\" is required");
